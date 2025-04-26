@@ -24,7 +24,7 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
     try {
       const feedback = {
         classification: classification || undefined,
-        rating: rating,
+        is_anomaly: classification !== 'Not Interesting', // Add is_anomaly property to match service
         comments: comments || undefined
       };
       
@@ -50,24 +50,26 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden w-full max-w-md">
       <div className="relative h-64 w-full">
         <Image 
-          src={anomaly.imageUrl} 
-          alt={anomaly.metadata.objectName || 'Astronomical anomaly'} 
+          src={anomaly.imageUrl || ''} 
+          alt={anomaly.metadata?.objectName || 'Astronomical anomaly'} 
           fill
           style={{ objectFit: 'cover' }}
         />
         <div className="absolute top-0 right-0 bg-black/70 text-white px-2 py-1 m-2 rounded text-xs">
-          Confidence: {Math.round(anomaly.confidence * 100)}%
+          Confidence: {Math.round((anomaly.confidence || 0) * 100)}%
         </div>
       </div>
       
       <div className="p-4">
-        <h3 className="font-bold text-lg mb-1">{anomaly.metadata.objectName || 'Unknown Object'}</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Type: {anomaly.type}</p>
+        <h3 className="font-bold text-lg mb-1">{anomaly.metadata?.objectName || 'Unknown Object'}</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Type: {anomaly.type || 'Unknown'}</p>
         
         <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1 mb-3">
-          <p>RA: {anomaly.coordinates.ra.toFixed(5)}, Dec: {anomaly.coordinates.dec.toFixed(5)}</p>
-          <p>Discovery: {anomaly.metadata.discoveryDate}</p>
-          <p>Instrument: {anomaly.metadata.instrument}</p>
+          {anomaly.coordinates && (
+            <p>RA: {anomaly.coordinates.ra.toFixed(5)}, Dec: {anomaly.coordinates.dec.toFixed(5)}</p>
+          )}
+          <p>Discovery: {anomaly.metadata?.discoveryDate || 'Unknown'}</p>
+          <p>Instrument: {anomaly.metadata?.instrument || 'Unknown'}</p>
         </div>
         
         {anomaly.userFeedback && (

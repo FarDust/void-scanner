@@ -105,6 +105,17 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
     setAnomalies([...demoAnomalies]);
     setCurrentIndex(0);
     setDemoMode(true);
+    
+    // Initialize default stats for demo mode
+    setApiStats({
+      total_images: demoAnomalies.length,
+      anomaly_count: demoAnomalies.length,
+      normal_count: 0,
+      processing_time_avg: 1.2,
+      storage_type: 'Demo Storage',
+      classified_images: 0,
+      average_anomaly_score: 0.85
+    });
   };
 
   const exitDemoMode = useCallback(() => {
@@ -211,7 +222,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
     }
   };
 
-  // Now handleKeyNavigation can reference both functions
+  // Fix handleKeyNavigation dependencies and function calls
   const handleKeyNavigation = useCallback((e: KeyboardEvent) => {
     if (loading || anomalies.length === 0) return;
     
@@ -235,7 +246,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
       default:
         break;
     }
-  }, [loading, anomalies.length, showDetailedForm, demoMode, exitDemoMode, handleInteresting, handleNotInteresting]);
+  }, [loading, anomalies.length, showDetailedForm, demoMode, exitDemoMode, handleNotInteresting, handleInteresting]);
   
   // Set up automatic sync every 120 minutes
   useEffect(() => {
@@ -860,7 +871,13 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
             </div>
           )}
           <div className="absolute top-0 right-0 bg-black/70 text-white px-2 py-1 m-2 rounded text-xs">
-            Anomaly Score: {currentAnomaly.anomaly_score ? currentAnomaly.anomaly_score.toFixed(2) : (currentAnomaly.confidence ? currentAnomaly.confidence.toFixed(2) : 'N/A')}
+            {currentAnomaly.anomaly_score !== undefined ? (
+              <>Anomaly Score: {currentAnomaly.anomaly_score.toFixed(2)}</>
+            ) : currentAnomaly.confidence !== undefined ? (
+              <>Confidence: {Math.round(currentAnomaly.confidence * 100)}%</>
+            ) : (
+              <>Score: N/A</>
+            )}
           </div>
         </div>
 
@@ -968,6 +985,208 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           </div>
         </div>
       </div>
+
+      {/* Detailed feedback form modal */}
+      {showDetailedForm && currentAnomaly && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Detailed Feedback</h3>
+              <button 
+                onClick={() => setShowDetailedForm(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Object: {objectName}</p>
+              {coordinates && (
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Coordinates: RA {coordinates.ra.toFixed(5)}, Dec {coordinates.dec.toFixed(5)}
+                </p>
+              )}
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setFeedbackSubmitting(true);
+              
+              // Handle form submission with delay to simulate API call
+              setTimeout(() => {
+                // In demo mode, just update local state
+                if (demoMode) {
+                  setStats(prev => ({
+                    ...prev,
+                    detailed: prev.detailed + 1
+                  }));
+                  
+                  // Update the current anomaly with the feedback
+                  const updatedAnomalies = [...anomalies];
+                  if (updatedAnomalies[currentIndex]) {
+                    updatedAnomalies[currentIndex] = {
+                      ...updatedAnomalies[currentIndex],
+                      userFeedback: {
+                        classification,
+                        comments
+                      }
+                    };
+                    setAnomalies(updatedAnomalies);
+                  }
+                } else {
+                  // Real mode - call API
+                  submitAnomalyFeedback(currentAnomaly.id, {
+                    classification,
+                    comments,
+                    is_anomaly: classification !== 'Not Interesting'
+                  }).then(updatedAnomaly => {
+                    if (updatedAnomaly) {
+                      // Update the anomalies array with the updated anomaly
+                      const updatedAnomalies = [...anomalies];
+                      updatedAnomalies[currentIndex] = updatedAnomaly;
+                      setAnomalies(updatedAnomalies);
+                    }
+                    
+                    setStats(prev => ({
+                      ...prev,
+                      detailed: prev.detailed + 1
+                    }));
+                  }).catch(err => {
+                    console.error('Error submitting detailed feedback:', err);
+                  });
+                }
+                
+                // Reset form state
+                setFeedbackSubmitting(false);
+                setShowDetailedForm(false);
+                setClassification('');
+                setComments('');
+                
+                // Move to the next anomaly after submission
+                setTimeout(() => {
+                  moveToNext();
+                }, 300);
+              }, 800);
+            }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Classification:
+                </label>
+                <select
+                  value={classification}
+                  onChange={(e) => setClassification(e.target.value)}
+                  className="w-full p-2 border rounded bg-white dark:bg-gray-700"
+                  required
+                >
+                  <option value="">Select a classification</option>
+                  <option value="Star">Star</option>
+                  <option value="Galaxy">Galaxy</option>
+                  <option value="Nebula">Nebula</option>
+                  <option value="Quasar">Quasar</option>
+                  <option value="Supernova">Supernova</option>
+                  <option value="Planet">Planet</option>
+                  <option value="Asteroid">Asteroid</option>
+                  <option value="Comet">Comet</option>
+                  <option value="Black Hole">Black Hole</option>
+                  <option value="Cosmic Ray">Cosmic Ray</option>
+                  <option value="Sensor Artifact">Sensor Artifact</option>
+                  <option value="Not Interesting">Not Interesting</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Comments:
+                </label>
+                <textarea
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                  rows={4}
+                  className="w-full p-2 border rounded bg-white dark:bg-gray-700"
+                  placeholder="Add any additional observations..."
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={feedbackSubmitting || !classification}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition-colors disabled:bg-blue-400"
+                >
+                  {feedbackSubmitting ? 'Submitting...' : 'Submit Feedback'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDetailedForm(false)}
+                  className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
+      {/* Keyboard shortcuts modal */}
+      {showKeyboardShortcuts && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Keyboard Shortcuts</h3>
+              <button 
+                onClick={() => setShowKeyboardShortcuts(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="border-2 border-gray-300 dark:border-gray-600 rounded w-12 h-10 flex items-center justify-center text-xl">
+                  ←
+                </div>
+                <div>Mark as "Not Interesting"</div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <div className="border-2 border-gray-300 dark:border-gray-600 rounded w-12 h-10 flex items-center justify-center text-xl">
+                  →
+                </div>
+                <div>Mark as "Interesting"</div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <div className="border-2 border-gray-300 dark:border-gray-600 rounded w-12 h-10 flex items-center justify-center text-xl">
+                  ↓
+                </div>
+                <div>Open detailed feedback form</div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <div className="border-2 border-gray-300 dark:border-gray-600 rounded w-12 h-10 flex items-center justify-center text-lg">
+                  ESC
+                </div>
+                <div>Exit demo mode (when active)</div>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setShowKeyboardShortcuts(false)}
+              className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition-colors"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

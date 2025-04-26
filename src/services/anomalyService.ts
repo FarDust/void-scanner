@@ -288,6 +288,7 @@ export const submitAnomalyFeedback = async (id: string, feedback: {
   classification?: string;
   is_anomaly?: boolean;
   comments?: string;
+  rating?: number;
 }): Promise<AnomalyObject | null> => {
   try {
     const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CLASSIFY_IMAGE(id)}`, {
@@ -313,7 +314,8 @@ export const submitAnomalyFeedback = async (id: string, feedback: {
       // Add the original feedback to our frontend model for UI display
       userFeedback: {
         classification: feedback.classification,
-        comments: feedback.comments
+        comments: feedback.comments,
+        rating: feedback.rating
       },
       // Generate an image URL using the image file endpoint
       imageUrl: `${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_FILE(data.id)}`
