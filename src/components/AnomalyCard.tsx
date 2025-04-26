@@ -85,7 +85,9 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
             fill
             sizes="(max-width: 768px) 100vw, 500px"
             className="object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
+            quality={70}
+            placeholder="blur"
+            blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFdwI2QOQvuQAAAABJRU5ErkJggg=="
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700">

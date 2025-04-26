@@ -1,17 +1,27 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { processImage } from '../services/anomalyService';
 
 export default function ImageUploader() {
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  // Update interface to match OpenAPI schema
   const [result, setResult] = useState<{
-    image_id: string;
+    id: string;
+    filename: string;
+    timestamp: string;
+    reconstruction_error: number;
     is_anomaly: boolean;
-    confidence: number;
-    processing_time: number;
+    anomaly_score: number;
+    path: string;
+    // Frontend-specific fields can be optional
+    confidence?: number;
+    imageUrl?: string;
+    processing_time?: number;
   } | null>(null);
   
   const inputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +63,10 @@ export default function ImageUploader() {
     }
     
     try {
+      // Create a local object URL for immediate preview
+      const objectUrl = URL.createObjectURL(file);
+      setUploadedImageUrl(objectUrl);
+      
       setUploading(true);
       setError(null);
       setResult(null);
@@ -128,48 +142,133 @@ export default function ImageUploader() {
       
       {result && (
         <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-          <h3 className="text-xl font-semibold mb-2">Analysis Results</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Image ID</p>
-              <p className="font-mono">{result.image_id}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Classification</p>
-              <div className={`font-medium ${result.is_anomaly ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
-                {result.is_anomaly ? 'Potential Anomaly' : 'Normal'}
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Confidence</p>
-              <div className="relative pt-1">
-                <div className="overflow-hidden h-2 mb-1 text-xs flex rounded bg-gray-200 dark:bg-gray-600">
-                  <div 
-                    style={{ width: `${result.confidence * 100}%` }}
-                    className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
-                      result.confidence < 0.7 ? 'bg-yellow-500' : 'bg-blue-500'
-                    }`}
-                  ></div>
-                </div>
-                <p>{Math.round(result.confidence * 100)}%</p>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Processing Time</p>
-              <p>{result.processing_time.toFixed(2)}ms</p>
-            </div>
-          </div>
+          <h3 className="text-xl font-semibold mb-4">Analysis Results</h3>
           
-          <div className="mt-4 text-right">
-            <a 
-              href={`/anomalies/${result.image_id}`}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              View Details
-            </a>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Image preview column */}
+            <div className="flex flex-col items-center">
+              <div className="w-full aspect-square relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-md">
+                {uploadedImageUrl && (
+                  <Image
+                    src={uploadedImageUrl}
+                    alt={result.filename || 'Uploaded image'}
+                    fill
+                    className="object-contain"
+                  />
+                )}
+              </div>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                {result.filename}
+              </p>
+            </div>
+            
+            {/* Analysis results column */}
+            <div className="flex flex-col">
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Image ID</p>
+                  <p className="font-mono text-sm truncate">{result.id}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Classification</p>
+                  <div className={`font-medium text-lg ${result.is_anomaly ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
+                    {result.is_anomaly ? 'Potential Anomaly' : 'Normal'}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Anomaly Score</p>
+                  <div className="relative pt-1">
+                    <div className={`overflow-hidden h-2 mb-1 text-xs flex rounded ${
+                      isExtremeOutlier(result.anomaly_score) 
+                        ? 'bg-red-200 dark:bg-red-900/30' 
+                        : 'bg-gray-200 dark:bg-gray-600'
+                    }`}>
+                      <div 
+                        style={{ width: normalizeScoreForDisplay(result.anomaly_score) }}
+                        className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
+                          isExtremeOutlier(result.anomaly_score)
+                            ? 'bg-red-600 animate-pulse'
+                            : result.anomaly_score > 100
+                              ? 'bg-orange-500' 
+                              : result.anomaly_score > 10
+                                ? 'bg-yellow-500'
+                                : 'bg-blue-500'
+                        }`}
+                      >
+                        {isExtremeOutlier(result.anomaly_score) && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-2xs font-bold text-white">!</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <p className={isExtremeOutlier(result.anomaly_score) ? 'text-red-600 dark:text-red-400 font-bold' : ''}>
+                        {formatAnomalyScore(result.anomaly_score)}
+                      </p>
+                      {isExtremeOutlier(result.anomaly_score) && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 animate-pulse">
+                          UNPROCESSABLE ENTITY
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Reconstruction Error</p>
+                  <p>{result.reconstruction_error.toFixed(4)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Processed</p>
+                  <p>{new Date(result.timestamp).toLocaleString()}</p>
+                </div>
+              </div>
+                
+              <div className="mt-4 text-right">
+                <a 
+                  href={`/anomalies/${result.id}`}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  View Details
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
+}
+
+// Helper function to detect extreme outliers
+function isExtremeOutlier(score: number): boolean {
+  return score > 1000;
+}
+
+// Helper functions for consistent score display
+function normalizeScoreForDisplay(score: number): string {
+  // Handle very high anomaly scores (like 651.57 in the example payload)
+  if (score <= 0) return "0%";
+  
+  // Identify extreme outliers (scores > 1000)
+  if (isExtremeOutlier(score)) {
+    return "100%"; // Max out the bar for extreme outliers
+  }
+  
+  // Log-based scale for normal range scores
+  const normalizedPercentage = Math.min(100 * (1 - 1 / (1 + Math.log10(1 + score * 9))), 100);
+  return `${normalizedPercentage.toFixed(0)}%`;
+}
+
+function formatAnomalyScore(score: number): string {
+  // Special handling for extreme outliers
+  if (isExtremeOutlier(score)) {
+    return `${Math.round(score)} ⚠️`;
+  }
+  
+  // Format the anomaly score for display based on its magnitude
+  if (score < 1) return score.toFixed(3);
+  if (score < 10) return score.toFixed(2);
+  if (score < 100) return score.toFixed(1);
+  return Math.round(score).toString();
 }

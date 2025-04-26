@@ -199,23 +199,56 @@ export const syncAnomalyData = async (): Promise<{
 };
 
 /**
- * Get all anomalies from the backend
+ * Get all anomalies from the backend with pagination support
  */
-export const getAnomalies = async (): Promise<AnomalyObject[]> => {
+export const getAnomalies = async (
+  page: number = 1,
+  pageSize: number = 12,
+  anomaliesOnly: boolean = true
+): Promise<{
+  data: AnomalyObject[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+}> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GET_IMAGES}?anomalies_only=true`);
+    // Add pagination parameters to the query
+    const queryParams = new URLSearchParams({
+      anomalies_only: anomaliesOnly.toString(),
+      page: page.toString(),
+      limit: pageSize.toString()
+    });
+    
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GET_IMAGES}?${queryParams}`);
     
     if (!response.ok) {
       throw new Error(`Error fetching anomalies: ${response.statusText}`);
     }
     
+    // Get total count from headers if available
+    const totalCount = parseInt(response.headers.get('X-Total-Count') || '0', 10);
+    
     const data = await response.json();
-    return data.map((item: any) => enhanceAnomalyData({
+    
+    // Enhance each anomaly with additional data
+    const enhancedData = data.map((item: any) => enhanceAnomalyData({
       ...item,
       imageUrl: `${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_FILE(item.id)}`
     }));
+    
+    // If API doesn't provide total count, use the data length (for demo purposes)
+    const actualTotalCount = totalCount || enhancedData.length;
+    const totalPages = Math.ceil(actualTotalCount / pageSize);
+    
+    return {
+      data: enhancedData,
+      totalCount: actualTotalCount,
+      currentPage: page,
+      totalPages: totalPages
+    };
   } catch (err) {
-    return handleApiError(err);
+    console.error('Error fetching anomalies:', err);
+    throw new Error(err?.message || 'An error occurred while fetching anomalies');
   }
 };
 

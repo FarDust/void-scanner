@@ -10,6 +10,7 @@ import {
   getStatistics,
   syncAnomalyData 
 } from '../services/anomalyService';
+import { useImageCache } from '../services/imageCache';
 
 // Mock examples for when no real anomalies are found
 const demoAnomalies: AnomalyObject[] = [
@@ -19,7 +20,7 @@ const demoAnomalies: AnomalyObject[] = [
     is_anomaly: true,
     confidence: 0.87,
     type: 'Training Example',
-    imageUrl: 'https://www.nasa.gov/sites/default/files/thumbnails/image/potw1805a.jpg',
+    imageUrl: 'https://science.nasa.gov/wp-content/uploads/2023/04/opo0019b-jpg.webp?w=700',
     coordinates: { ra: 83.82208, dec: -5.39111 },
     metadata: {
       objectName: 'Orion Nebula Example',
@@ -51,7 +52,7 @@ const demoAnomalies: AnomalyObject[] = [
     is_anomaly: true,
     confidence: 0.78,
     type: 'Practice Anomaly',
-    imageUrl: 'https://www.nasa.gov/sites/default/files/thumbnails/image/potw1936a.jpg',
+    imageUrl: 'https://cdn.eso.org/images/thumb700x/eso-6302.jpg',
     coordinates: { ra: 299.86542, dec: 40.73389 },
     metadata: {
       objectName: 'Butterfly Nebula Example',
@@ -90,6 +91,12 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
     notInteresting: 0,
     detailed: 0
   });
+  
+  // Use our custom image cache hook
+  const { preloadImage, preloadImages, isImageCached, cacheStats } = useImageCache();
+  
+  // New state for preloaded images
+  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
 
   const [syncStatus, setSyncStatus] = useState<{
     syncing: boolean;
@@ -291,11 +298,18 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
         if (!demoMode) {
           try {
             // Fetch anomalies, normal images, and statistics in parallel
-            const [anomaliesData, normalImagesData, statsData] = await Promise.all([
+            const [anomaliesResponse, normalImagesData, statsData] = await Promise.all([
               getAnomalies(),
               getNormalImages(5), // Get up to 5 normal images to mix in
               getStatistics()
             ]);
+            
+            // Extract anomalies data from the response and ensure it's an array
+            const anomaliesData = Array.isArray(anomaliesResponse.data) 
+              ? anomaliesResponse.data 
+              : anomaliesResponse.data 
+                ? [anomaliesResponse.data] 
+                : [];
             
             // If we reach here, the backend connection is successful
             setBackendConnectionFailed(false);
@@ -303,7 +317,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
             // Mix in some normal images with the anomalous ones for better training
             let mixedData = [...anomaliesData];
             
-            if (normalImagesData.length > 0) {
+            if (normalImagesData && normalImagesData.length > 0) {
               // Add a normal image every few anomalies
               const normalInterval = Math.max(3, Math.floor(anomaliesData.length / normalImagesData.length));
               
@@ -332,8 +346,9 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
             // Auto-activate demo mode with warning when backend can't be reached
             startDemoMode();
             
-            // Set error to show in UI, but don't block the demo mode activation
-            setError('Could not connect to the anomaly detection backend. Demo mode has been activated.');
+            // Since we're auto-activating demo mode, don't set an error message
+            // as that would display the error UI and block the demo mode
+            setError(null);
           }
         }
       } finally {
@@ -440,16 +455,23 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
               const refreshData = async () => {
                 try {
                   // Fetch anomalies, normal images, and statistics in parallel
-                  const [anomaliesData, normalImagesData, statsData] = await Promise.all([
+                  const [anomaliesResponse, normalImagesData, statsData] = await Promise.all([
                     getAnomalies(),
                     getNormalImages(5),
                     getStatistics()
                   ]);
                   
+                  // Extract anomalies data from the response and ensure it's an array
+                  const anomaliesData = Array.isArray(anomaliesResponse.data) 
+                    ? anomaliesResponse.data 
+                    : anomaliesResponse.data 
+                      ? [anomaliesResponse.data] 
+                      : [];
+                  
                   // Mix in some normal images with the anomalous ones
                   let mixedData = [...anomaliesData];
                   
-                  if (normalImagesData.length > 0) {
+                  if (normalImagesData && normalImagesData.length > 0) {
                     const normalInterval = Math.max(3, Math.floor(anomaliesData.length / normalImagesData.length));
                     
                     normalImagesData.forEach((normalImg, index) => {
@@ -862,8 +884,13 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
               src={currentAnomaly.imageUrl}
               alt={objectName}
               fill
-              style={{ objectFit: 'contain' }}  // Maintains aspect ratio
-              className="bg-black"  // Added to provide contrast for transparent areas
+              priority={true}
+              quality={75}
+              style={{ objectFit: 'contain' }}
+              className="bg-black transition-opacity duration-300 opacity-100"
+              sizes="(max-width: 768px) 100vw, 700px"
+              placeholder="blur"
+              blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFdwI2QOQvuQAAAABJRU5ErkJggg=="
             />
           ) : (
             <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
