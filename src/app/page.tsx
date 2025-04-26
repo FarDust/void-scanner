@@ -1,10 +1,15 @@
 'use client';  // This must be the first line for client-side React features
 
 import TinderStyleAnomalyView from "@/components/TinderStyleAnomalyView";
+import AnomalyDashboard from "@/components/AnomalyDashboard";
+import StatisticsPanel from "@/components/StatisticsPanel";
+import ImageUploader from "@/components/ImageUploader";
+import SyncDataPanel from "@/components/SyncDataPanel";
 import { useState } from 'react';
 
 export default function Home() {
   const [showDemoControls, setShowDemoControls] = useState(false);
+  const [activeTab, setActiveTab] = useState('tinder');
   
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -21,6 +26,52 @@ export default function Home() {
             >
               Demo Mode
             </button>
+          </div>
+          
+          {/* Navigation Tabs */}
+          <div className="mt-8 border-b border-blue-800">
+            <nav className="-mb-px flex space-x-6">
+              <button
+                onClick={() => setActiveTab('tinder')}
+                className={`pb-3 px-1 ${
+                  activeTab === 'tinder'
+                    ? 'border-b-2 border-white font-medium'
+                    : 'text-blue-200 hover:text-white hover:border-blue-300 border-b-2 border-transparent'
+                }`}
+              >
+                Anomaly Review
+              </button>
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`pb-3 px-1 ${
+                  activeTab === 'dashboard'
+                    ? 'border-b-2 border-white font-medium'
+                    : 'text-blue-200 hover:text-white hover:border-blue-300 border-b-2 border-transparent'
+                }`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => setActiveTab('upload')}
+                className={`pb-3 px-1 ${
+                  activeTab === 'upload'
+                    ? 'border-b-2 border-white font-medium'
+                    : 'text-blue-200 hover:text-white hover:border-blue-300 border-b-2 border-transparent'
+                }`}
+              >
+                Upload Image
+              </button>
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`pb-3 px-1 ${
+                  activeTab === 'admin'
+                    ? 'border-b-2 border-white font-medium'
+                    : 'text-blue-200 hover:text-white hover:border-blue-300 border-b-2 border-transparent'
+                }`}
+              >
+                Admin Tools
+              </button>
+            </nav>
           </div>
         </div>
       </header>
@@ -39,10 +90,41 @@ export default function Home() {
           </div>
         )}
         
-        {/* Main anomaly visualization dashboard */}
-        <section>
-          <TinderStyleAnomalyView demoControlsVisible={showDemoControls} />
-        </section>
+        {/* Content based on active tab */}
+        {activeTab === 'tinder' && (
+          <section>
+            <TinderStyleAnomalyView demoControlsVisible={showDemoControls} />
+          </section>
+        )}
+        
+        {activeTab === 'dashboard' && (
+          <div className="space-y-8">
+            <StatisticsPanel />
+            <AnomalyDashboard />
+          </div>
+        )}
+        
+        {activeTab === 'upload' && (
+          <section>
+            <ImageUploader />
+          </section>
+        )}
+        
+        {activeTab === 'admin' && (
+          <section className="space-y-8">
+            <SyncDataPanel />
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+              <h2 className="text-2xl font-bold mb-4">System Health</h2>
+              <div className="flex items-center mb-4">
+                <div className="h-4 w-4 rounded-full bg-green-500 mr-2"></div>
+                <span>API Status: Online</span>
+              </div>
+              <p className="text-gray-600 dark:text-gray-300">
+                The Anomaly Reaper API is operating normally. Last health check: {new Date().toLocaleTimeString()}
+              </p>
+            </div>
+          </section>
+        )}
       </main>
 
       <footer className="bg-gray-800 text-white py-8 mt-16">

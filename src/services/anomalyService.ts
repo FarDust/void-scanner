@@ -39,8 +39,6 @@ const API_ENDPOINTS = {
   GET_IMAGE_DETAILS: (id: string) => `/images/${id}`,
   GET_IMAGE_FILE: (id: string) => `/images/${id}/file`,
   CLASSIFY_IMAGE: (id: string) => `/images/${id}/classify`,
-  EXPORT_CSV: '/export/csv',
-  EXPORT_ANOMALIES_CSV: '/export/anomalies/csv',
   STATISTICS: '/statistics',
   SYNC_ANOMALY_DATA: '/sync-anomaly-data'
 };
