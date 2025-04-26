@@ -1,7 +1,5 @@
 # Void Scanner
 
-![Void Scanner Logo](./public/file.svg)
-
 ## Astronomical Anomaly Detection System
 
 *Current Version: 1.0.0 (April 26, 2025)*
