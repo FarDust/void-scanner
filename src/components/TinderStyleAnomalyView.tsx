@@ -417,19 +417,67 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
       // If sync was successful, refresh the data after a short delay
       if (result.success) {
         setTimeout(() => {
-          setLoading(true);
           setCurrentIndex(0);
-          setDemoMode(false); // Exit demo mode if active
           setBackendConnectionFailed(false);
           
-          // Re-fetch everything by toggling demoMode quickly
-          setDemoMode(false);
-        }, silent ? 100 : 2000);  // Shorter delay for silent sync
+          // Instead of toggling demoMode, trigger a re-fetch directly
+          setLoading(true);
+          // Use a separate timeout to give React time to update the UI
+          setTimeout(() => {
+            // Only fetch if we're not in demo mode
+            if (!demoMode) {
+              const refreshData = async () => {
+                try {
+                  // Fetch anomalies, normal images, and statistics in parallel
+                  const [anomaliesData, normalImagesData, statsData] = await Promise.all([
+                    getAnomalies(),
+                    getNormalImages(5),
+                    getStatistics()
+                  ]);
+                  
+                  // Mix in some normal images with the anomalous ones
+                  let mixedData = [...anomaliesData];
+                  
+                  if (normalImagesData.length > 0) {
+                    const normalInterval = Math.max(3, Math.floor(anomaliesData.length / normalImagesData.length));
+                    
+                    normalImagesData.forEach((normalImg, index) => {
+                      const insertPosition = Math.min(
+                        (index + 1) * normalInterval, 
+                        mixedData.length
+                      );
+                      mixedData.splice(insertPosition, 0, normalImg);
+                    });
+                  }
+                  
+                  setAnomalies(mixedData);
+                  setApiStats(statsData);
+                } catch (err) {
+                  console.error('Error refreshing data:', err);
+                  setError('Failed to refresh data after sync.');
+                } finally {
+                  setLoading(false);
+                }
+              };
+              
+              refreshData();
+            } else {
+              // If in demo mode, just reset loading state
+              setLoading(false);
+            }
+          }, 100);
+        }, silent ? 100 : 1000); // Shorter delay for silent sync
+      } else {
+        // Make sure loading is reset if sync wasn't successful
+        setLoading(false);
       }
       
       return result;
     } catch (err: any) {
       console.error('Error syncing data:', err);
+      
+      // Always reset loading state on error
+      setLoading(false);
       
       // If this was a silent sync, don't show error UI
       if (!silent) {
