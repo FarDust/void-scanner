@@ -1,0 +1,468 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Anomaly Reaper",
+    "description": "API for detecting anomalies in images using PCA",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Health check endpoint to verify the API is running.\n\nReturns\n-------\nHealthCheckResponse\n    Status of the API",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthCheckResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/process": {
+      "post": {
+        "summary": "Process Single Image",
+        "description": "Process a single image for anomaly detection.\n\nParameters\n----------\nfile : UploadFile\n    The image file to process\n\nReturns\n-------\nImageResponse\n    The processing results",
+        "operationId": "process_single_image_process_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_process_single_image_process_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ImageResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/": {
+      "get": {
+        "summary": "Get Images",
+        "description": "Get list of processed images from the database.\n\nParameters\n----------\nanomalies_only : bool\n    If True, only return anomalous images\n\nReturns\n-------\nList[ImageResponse]\n    List of image records",
+        "operationId": "get_images_images__get",
+        "parameters": [
+          {
+            "name": "anomalies_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Anomalies Only"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ImageResponse" },
+                  "title": "Response Get Images Images  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}": {
+      "get": {
+        "summary": "Get Image Details",
+        "description": "Get details for a specific image.\n\nParameters\n----------\nimage_id : str\n    ID of the image to retrieve\n\nReturns\n-------\nImageResponse\n    Image details",
+        "operationId": "get_image_details_images__image_id__get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "title": "Image Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ImageResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}/file": {
+      "get": {
+        "summary": "Get Image File",
+        "description": "Retrieve the image file for a specific image.\n\nParameters\n----------\nimage_id : str\n    ID of the image to retrieve\n\nReturns\n-------\nFileResponse\n    The image file",
+        "operationId": "get_image_file_images__image_id__file_get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "title": "Image Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}/classify": {
+      "post": {
+        "summary": "Api Classify Image",
+        "description": "Classify an image as anomalous or normal.\n\nParameters\n----------\nimage_id : str\n    ID of the image to classify\nrequest : ImageClassificationRequest\n    Request containing is_anomaly and optional comment fields\n\nReturns\n-------\nImageClassificationResponse\n    Classification result",
+        "operationId": "api_classify_image_images__image_id__classify_post",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "title": "Image Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageClassificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageClassificationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/statistics": {
+      "get": {
+        "summary": "Api Statistics",
+        "description": "Get statistics about processed images.\n\nReturns\n-------\nStatisticsResponse\n    Statistics about processed images",
+        "operationId": "api_statistics_statistics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StatisticsResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync-anomaly-data": {
+      "post": {
+        "summary": "Sync Anomaly Data",
+        "description": "Synchronize anomaly detection data from GCS bucket or local storage.\n\nThis endpoint loads pre-calculated anomaly detection data from either:\n- GCS: gs://fardust-portfolio/anomaly_reaper/embeddings_df.csv\n- Local: ./data/embeddings_df.csv\n\nIt checks which images are already in the database and only imports the new ones.\nNo request body is needed - the endpoint automatically detects the correct data source.\n\nReturns\n-------\nSyncAnomalyDataResponse\n    Summary of synchronization results",
+        "operationId": "sync_anomaly_data_sync_anomaly_data_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncAnomalyDataResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_process_single_image_process_post": {
+        "properties": {
+          "file": { "type": "string", "format": "binary", "title": "File" }
+        },
+        "type": "object",
+        "required": ["file"],
+        "title": "Body_process_single_image_process_post"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": { "$ref": "#/components/schemas/ValidationError" },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthCheckResponse": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "version": { "type": "string", "title": "Version" }
+        },
+        "type": "object",
+        "required": ["status", "version"],
+        "title": "HealthCheckResponse",
+        "description": "Pydantic model for health check response.\n\nAttributes\n----------\nstatus : str\n    Status of the API (e.g., \"ok\")\ntimestamp : datetime.datetime\n    Current timestamp\nversion : str\n    API version",
+        "examples": [
+          {
+            "status": "ok",
+            "timestamp": "2025-04-25T12:34:56.789Z",
+            "version": "1.0.0"
+          }
+        ]
+      },
+      "ImageClassificationRequest": {
+        "properties": {
+          "is_anomaly": {
+            "type": "boolean",
+            "title": "Is Anomaly",
+            "description": "True if image is anomalous, False otherwise"
+          },
+          "comment": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Comment",
+            "description": "Optional comment about the classification"
+          }
+        },
+        "type": "object",
+        "required": ["is_anomaly"],
+        "title": "ImageClassificationRequest",
+        "description": "Pydantic model for image classification request.\n\nAttributes\n----------\nis_anomaly : bool\n    Whether the image is an anomaly (True) or normal (False)\ncomment : str, optional\n    Optional comment about the classification",
+        "examples": [
+          {
+            "comment": "This appears to be an anomaly due to the unusual brightness pattern.",
+            "is_anomaly": true
+          }
+        ]
+      },
+      "ImageClassificationResponse": {
+        "properties": {
+          "id": { "type": "string", "title": "Id" },
+          "user_classification": {
+            "type": "boolean",
+            "title": "User Classification"
+          },
+          "comment": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": ["id", "user_classification", "comment"],
+        "title": "ImageClassificationResponse",
+        "description": "Pydantic model for image classification response.\n\nAttributes\n----------\nid : str\n    ID of the classified image\nuser_classification : bool\n    Whether the image was classified as an anomaly by the user\ncomment : str, optional\n    Optional comment about the classification",
+        "examples": [
+          {
+            "comment": "This appears to be an anomaly due to the unusual brightness pattern.",
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "user_classification": true
+          }
+        ]
+      },
+      "ImageResponse": {
+        "properties": {
+          "id": { "type": "string", "title": "Id" },
+          "filename": { "type": "string", "title": "Filename" },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "reconstruction_error": {
+            "type": "number",
+            "title": "Reconstruction Error"
+          },
+          "is_anomaly": { "type": "boolean", "title": "Is Anomaly" },
+          "anomaly_score": { "type": "number", "title": "Anomaly Score" },
+          "path": { "type": "string", "title": "Path" }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "timestamp",
+          "reconstruction_error",
+          "is_anomaly",
+          "anomaly_score",
+          "path"
+        ],
+        "title": "ImageResponse",
+        "description": "Pydantic model for image response data.\n\nThis model defines the structure of the API response when returning\nimage anomaly detection results.\n\nAttributes\n----------\nid : str\n    Unique identifier for the image\nfilename : str\n    Original filename of the image\ntimestamp : datetime\n    When the image was processed\nreconstruction_error : float\n    PCA reconstruction error for the image\nis_anomaly : bool\n    Whether the image was classified as an anomaly\nanomaly_score : float\n    Normalized anomaly score\npath : str\n    Path where the image is stored\n\nExamples\n--------\n>>> image_response = ImageResponse(\n...     id=\"550e8400-e29b-41d4-a716-446655440000\",\n...     filename=\"example.jpg\",\n...     timestamp=datetime.datetime.now(),\n...     reconstruction_error=0.123,\n...     is_anomaly=True,\n...     anomaly_score=2.5,\n...     path=\"/uploads/example.jpg\"\n... )\n>>> print(image_response.is_anomaly)\nTrue",
+        "examples": [
+          {
+            "anomaly_score": 2.5,
+            "filename": "example.jpg",
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "is_anomaly": true,
+            "path": "/uploads/550e8400-e29b-41d4-a716-446655440000.jpg",
+            "reconstruction_error": 0.123,
+            "timestamp": "2025-04-25T12:34:56.789Z"
+          }
+        ]
+      },
+      "StatisticsResponse": {
+        "properties": {
+          "total_images": { "type": "integer", "title": "Total Images" },
+          "anomalies_detected": {
+            "type": "integer",
+            "title": "Anomalies Detected"
+          },
+          "classified_images": {
+            "type": "integer",
+            "title": "Classified Images"
+          },
+          "average_anomaly_score": {
+            "type": "number",
+            "title": "Average Anomaly Score"
+          },
+          "storage_type": { "type": "string", "title": "Storage Type" },
+          "storage_location": { "type": "string", "title": "Storage Location" }
+        },
+        "type": "object",
+        "required": [
+          "total_images",
+          "anomalies_detected",
+          "classified_images",
+          "average_anomaly_score",
+          "storage_type",
+          "storage_location"
+        ],
+        "title": "StatisticsResponse",
+        "description": "Pydantic model for statistics response.\n\nAttributes\n----------\ntotal_images : int\n    Total number of images processed\nanomalies_detected : int\n    Number of anomalies detected\nclassified_images : int\n    Number of images that have been classified by users\naverage_anomaly_score : float\n    Average anomaly score across all images\nstorage_type : str\n    Type of storage being used (e.g., \"Google Cloud Storage\" or \"Local\")\nstorage_location : str\n    Location where images are being stored",
+        "examples": [
+          {
+            "anomalies_detected": 10,
+            "average_anomaly_score": 0.3,
+            "classified_images": 50,
+            "storage_location": "my-bucket",
+            "storage_type": "Google Cloud Storage",
+            "total_images": 100
+          }
+        ]
+      },
+      "SyncAnomalyDataResponse": {
+        "properties": {
+          "message": { "type": "string", "title": "Message" },
+          "source": { "type": "string", "title": "Source" },
+          "imported_count": { "type": "integer", "title": "Imported Count" },
+          "anomaly_count": { "type": "integer", "title": "Anomaly Count" },
+          "skipped_count": { "type": "integer", "title": "Skipped Count" },
+          "error_count": { "type": "integer", "title": "Error Count" },
+          "total_records": { "type": "integer", "title": "Total Records" }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "source",
+          "imported_count",
+          "anomaly_count",
+          "skipped_count",
+          "error_count",
+          "total_records"
+        ],
+        "title": "SyncAnomalyDataResponse",
+        "description": "Pydantic model for synchronizing anomaly data response.\n\nAttributes\n----------\nmessage : str\n    Summary message about the synchronization\nsource : str\n    Source of the anomaly data\nimported_count : int\n    Number of new records imported\nanomaly_count : int\n    Number of anomalies among imported records\nskipped_count : int\n    Number of records skipped (already in DB)\nerror_count : int\n    Number of records that had errors\ntotal_records : int\n    Total number of records after synchronization",
+        "examples": [
+          {
+            "anomaly_count": 5,
+            "error_count": 0,
+            "imported_count": 50,
+            "message": "Successfully synchronized anomaly data",
+            "skipped_count": 10,
+            "source": "gs://my-bucket/anomaly_reaper/embeddings_df.csv",
+            "total_records": 150
+          }
+        ]
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": { "anyOf": [{ "type": "string" }, { "type": "integer" }] },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": { "type": "string", "title": "Message" },
+          "type": { "type": "string", "title": "Error Type" }
+        },
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
