@@ -3,59 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AnomalyObject, getAnomalies, getStatistics } from '../services/anomalyService';
 import AnomalyCard from './AnomalyCard';
-import SyncDataPanel from './SyncDataPanel';
 import { useImageCache } from '../services/imageCache';
-import StatisticsPanel from './StatisticsPanel';
-import TinderStyleAnomalyView from './TinderStyleAnomalyView';
-
-// Demo data for when API is unavailable
-const demoAnomalies: AnomalyObject[] = [
-  {
-    id: 'demo-001',
-    file_path: '',
-    is_anomaly: true,
-    type: 'Training Example',
-    imageUrl: 'https://science.nasa.gov/wp-content/uploads/2023/04/opo0019b-jpg.webp?w=700g',
-    coordinates: { ra: 83.82208, dec: -5.39111 },
-    metadata: {
-      objectName: 'Orion Nebula Example',
-      discoveryDate: '2025-04-25',
-      instrument: 'TESS Demo'
-    },
-    timestamp: '2025-04-25',
-    processing_time: 1.2,
-  },
-  {
-    id: 'demo-002',
-    file_path: '',
-    is_anomaly: true,
-    type: 'Practice Object',
-    imageUrl: 'https://esahubble.org/media/archives/images/large/potw1150a.jpg',
-    coordinates: { ra: 114.82542, dec: 21.12889 },
-    metadata: {
-      objectName: 'Whirlpool Galaxy Example',
-      discoveryDate: '2025-04-25',
-      instrument: 'TESS Demo'
-    },
-    timestamp: '2025-04-25',
-    processing_time: 1.5,
-  },
-  {
-    id: 'demo-003',
-    file_path: '',
-    is_anomaly: true,
-    type: 'Practice Anomaly',
-    imageUrl: 'https://cdn.eso.org/images/thumb700x/eso-6302.jpg',
-    coordinates: { ra: 299.86542, dec: 40.73389 },
-    metadata: {
-      objectName: 'Butterfly Nebula Example',
-      discoveryDate: '2025-04-25',
-      instrument: 'TESS Demo'
-    },
-    timestamp: '2025-04-25',
-    processing_time: 0.9,
-  }
-];
 
 // Custom hook for debounce
 function useDebounce<T>(value: T, delay: number): T {
@@ -105,18 +53,14 @@ export default function AnomalyDashboard() {
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   
-  // New state variables from NewAnomalyDashboard
-  const [viewMode, setViewMode] = useState<'grid' | 'tinder'>('grid');
-  const [userType, setUserType] = useState<'user' | 'admin'>('user');
+  // Dashboard filter states
   const [showAnomaliesOnly, setShowAnomaliesOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'score'>('recent');
   const [searchQuery, setSearchQuery] = useState('');
-  const [lastFetchTime, setLastFetchTime] = useState(0);
-  const [stats, setStats] = useState<AnomalyStats | null>(null);
-
-  // API stats for cache optimization
-  const apiStats = useRef({ size: 0, imageUrlCacheSize: 0, requestQueueSize: 0 });
   
+  // Use ref for lastFetchTime instead of state to avoid render loops
+  const lastFetchTimeRef = useRef(0);
+
   // Debounce filters to prevent excessive API calls
   const debouncedAnomaliesOnly = useDebounce(showAnomaliesOnly, 500);
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
@@ -143,28 +87,6 @@ export default function AnomalyDashboard() {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadingRef = useRef<HTMLDivElement | null>(null);
 
-  // Load statistics only when needed and cache them
-  const loadStatistics = useCallback(async () => {
-    try {
-      const statsData = await getStatistics();
-      if (isMounted.current) {
-        setStats(statsData);
-      }
-    } catch (err) {
-      console.error('Error fetching statistics:', err);
-    }
-  }, []);
-
-  // Merged cache stats using useMemo instead of useEffect
-  const mergedStats = useMemo(() => {
-    return {
-      ...cacheStats,
-      apiCacheSize: apiStats.current.size,
-      imageUrlCacheSize: apiStats.current.imageUrlCacheSize,
-      requestQueueSize: apiStats.current.requestQueueSize
-    };
-  }, [cacheStats]); // Only depends on cacheStats changes
-
   // Define fetchAnomalies as a useCallback with proper dependencies
   const fetchAnomalies = useCallback(async (isRefresh = false, pageNum = 1) => {
     // Check API availability status
@@ -182,7 +104,7 @@ export default function AnomalyDashboard() {
     }
     
     // Standard rate limiting for normal operation - prevent fetching more than once every 5 seconds
-    if (now - lastFetchTime < 5000 && !isRefresh && pageNum > 1) {
+    if (now - lastFetchTimeRef.current < 5000 && !isRefresh && pageNum > 1) {
       console.log('Rate limited API call, skipping fetch');
       return;
     }
@@ -201,8 +123,8 @@ export default function AnomalyDashboard() {
         setLoadingMore(true);
       }
       
-      // Update last fetch time
-      setLastFetchTime(now);
+      // Update last fetch time using ref instead of state
+      lastFetchTimeRef.current = now;
       
       // Use the paginated API with the correct parameters
       const pageSize = 9; // Keep this consistent with the OpenAPI spec
@@ -272,30 +194,19 @@ export default function AnomalyDashboard() {
       
       console.log(`API unavailable. Consecutive failures: ${apiStatus.consecutiveFailures}. Next attempt in ${Math.ceil(apiStatus.backoffTime/1000)}s`);
       
-      setError(`Failed to load data from the API. Showing demo data instead. Will retry in ${Math.ceil(apiStatus.backoffTime/1000)} seconds.`);
+      setError(`Failed to load data from the API. Will retry in ${Math.ceil(apiStatus.backoffTime/1000)} seconds.`);
+      setIsDemoMode(false);
       
-      // Only replace with demo data if this is the first page
+      // Instead of using hardcoded demo data, display an empty state
       if (pageNum === 1) {
-        setAnomalies(demoAnomalies);
-        setIsDemoMode(true);
-        
-        // Preload demo images
-        const demoImagesToPreload = demoAnomalies
-          .filter(a => a.imageUrl && !isImageCached(a.imageUrl))
-          .map(a => a.imageUrl as string);
-          
-        if (demoImagesToPreload.length > 0) {
-          preloadImages(demoImagesToPreload, true).catch(err => {
-            console.error("Error preloading demo images:", err);
-          });
-        }
+        setAnomalies([]);
       }
     } finally {
       setLoading(false);
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [isImageCached, preloadImages, lastFetchTime, debouncedAnomaliesOnly, isDemoMode]); // Added isDemoMode to dependencies
+  }, [isImageCached, preloadImages, debouncedAnomaliesOnly, isDemoMode]);
 
   // Initial data load - Fetch when anomaliesOnly filter changes (debounced)
   useEffect(() => {
@@ -347,12 +258,11 @@ export default function AnomalyDashboard() {
     };
   }, [fetchAnomalies, hasMore, loading, loadingMore, refreshing]);
 
-  // Periodically check API availability if in demo mode
-  // Add an effect to retry connecting to the API periodically when in demo mode
+  // Periodically check API availability if in error state
   useEffect(() => {
     let retryTimer: NodeJS.Timeout | null = null;
     
-    if (isDemoMode && apiAvailabilityRef.current.consecutiveFailures > 0) {
+    if (apiAvailabilityRef.current.consecutiveFailures > 0) {
       retryTimer = setTimeout(() => {
         console.log("Attempting to reconnect to the API...");
         fetchAnomalies(true); // Force refresh to try reconnecting
@@ -364,7 +274,7 @@ export default function AnomalyDashboard() {
         clearTimeout(retryTimer);
       }
     };
-  }, [isDemoMode, fetchAnomalies]);
+  }, [error, fetchAnomalies]);
 
   // Filter and sort anomalies based on user selection
   const filteredAnomalies = useMemo(() => {
@@ -400,25 +310,6 @@ export default function AnomalyDashboard() {
     
     return result;
   }, [anomalies, sortBy, debouncedSearchQuery]);
-  
-  // Display cache statistics only when logging is needed
-  const prevCacheStatsRef = useRef(cacheStats);
-  useEffect(() => {
-    // Only log in development environment and only when actual values change
-    if (process.env.NODE_ENV === 'development' && 
-        (prevCacheStatsRef.current.hits !== cacheStats.hits || 
-         prevCacheStatsRef.current.misses !== cacheStats.misses || 
-         prevCacheStatsRef.current.size !== cacheStats.size)) {
-      console.log('Cache stats updated:', {
-        ...cacheStats,
-        apiCacheSize: apiStats.current.size,
-        imageUrlCacheSize: apiStats.current.imageUrlCacheSize,
-        requestQueueSize: apiStats.current.requestQueueSize
-      });
-      // Update ref to current value
-      prevCacheStatsRef.current = cacheStats;
-    }
-  }, [cacheStats]); // Only depend on cacheStats, not the derived mergedStats
 
   // Function to trigger a refresh from child components
   const handleDataRefresh = () => {
@@ -435,22 +326,6 @@ export default function AnomalyDashboard() {
     setFeedbackCount(prev => prev + 1);
   };
 
-  // Toggle between grid and tinder view
-  const toggleViewMode = () => {
-    setViewMode(prev => prev === 'grid' ? 'tinder' : 'grid');
-  };
-
-  // Toggle user type (admin/user)
-  const toggleUserType = () => {
-    const newUserType = userType === 'user' ? 'admin' : 'user';
-    setUserType(newUserType);
-    
-    // Load statistics when switching TO admin mode, not FROM user mode
-    if (newUserType === 'admin') {
-      loadStatistics();
-    }
-  };
-
   // Toggle anomalies filter
   const toggleAnomaliesFilter = () => {
     setShowAnomaliesOnly(prev => !prev);
@@ -460,14 +335,6 @@ export default function AnomalyDashboard() {
   // Toggle sort method
   const toggleSortMethod = () => {
     setSortBy(prev => prev === 'recent' ? 'score' : 'recent');
-  };
-
-  // Handle image loaded - minimal logging to prevent console spam
-  const handleImageLoaded = (id: string) => {
-    // Only log in development and only rarely (5% of the time) to reduce noise
-    if (process.env.NODE_ENV === 'development' && Math.random() < 0.05) {
-      console.log(`Image ${id} loaded from ${isImageCached(`/images/${id}/file`) ? 'cache' : 'network'}`);
-    }
   };
 
   // Calculate statistics
@@ -505,13 +372,6 @@ export default function AnomalyDashboard() {
       <div className="flex flex-wrap justify-between items-center mb-6">
         <div className="flex items-center space-x-4 mb-4 md:mb-0">
           <button
-            onClick={toggleViewMode}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            {viewMode === 'grid' ? 'Switch to Tinder View' : 'Switch to Grid View'}
-          </button>
-          
-          <button
             onClick={toggleAnomaliesFilter}
             className={`px-4 py-2 rounded ${showAnomaliesOnly ? 'bg-green-600 text-white' : 'bg-gray-200'}`}
           >
@@ -544,97 +404,39 @@ export default function AnomalyDashboard() {
           >
             Sort: {sortBy === 'recent' ? 'Most Recent' : 'Highest Score'}
           </button>
-          
-          <button
-            onClick={toggleUserType}
-            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-          >
-            {userType === 'user' ? 'Switch to Admin View' : 'Switch to User View'}
-          </button>
         </div>
       </div>
       
-      {/* Fixed height for SyncDataPanel section */}
-      <div className="mb-8 mt-8" style={{ height: '220px' }}>
-        <SyncDataPanel onDataRefreshed={handleDataRefresh} />
-      </div>
-      
-      {/* Admin dashboard stats section */}
-      {userType === 'admin' && (
-        <div className="mb-8">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Admin Dashboard</h2>
-            <div className="flex items-center space-x-2">
-              <div className="h-3 w-3 bg-green-500 rounded-full"></div>
-              <span>API Status: Online</span>
-            </div>
-          </div>
-          
-          <StatisticsPanel 
-            userMode={false}
-          />
-          
-          {/* Additional Cache Statistics from NewAnomalyDashboard */}
-          <div className="mt-8 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
-            <h3 className="text-lg font-semibold mb-2">Cache Statistics</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Items in cache</p>
-                <p className="text-xl font-bold">{cacheStats.size}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Cache hits</p>
-                <p className="text-xl font-bold">{cacheStats.hits}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Cache misses</p>
-                <p className="text-xl font-bold">{cacheStats.misses}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Hit ratio</p>
-                <p className="text-xl font-bold">
-                  {cacheStats.hits + cacheStats.misses > 0 
-                    ? ((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100).toFixed(2) + '%' 
-                    : 'N/A'}
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* Error message container with flexible height */}
+      {error && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
+          <p className="flex items-center">
+            <svg className="h-5 w-5 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            {error}
+            {apiAvailabilityRef.current.consecutiveFailures > 0 && (
+              <span className="ml-2">
+                (Retry in {Math.ceil((apiAvailabilityRef.current.backoffTime - (Date.now() - apiAvailabilityRef.current.lastAttempt))/1000)}s)
+              </span>
+            )}
+          </p>
         </div>
       )}
       
-      {/* Fixed height for demo mode notice */}
-      <div style={{ height: isDemoMode ? '60px' : '0px', overflow: 'hidden' }}>
-        {isDemoMode && (
-          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6">
-            <p className="flex items-center">
-              <svg className="h-5 w-5 text-yellow-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              Demo Mode: Using example data because the API is unavailable
-              {apiAvailabilityRef.current.consecutiveFailures > 0 && (
-                <span className="ml-2">
-                  (Retry in {Math.ceil((apiAvailabilityRef.current.backoffTime - (Date.now() - apiAvailabilityRef.current.lastAttempt))/1000)}s)
-                </span>
-              )}
-            </p>
-          </div>
-        )}
-      </div>
-      
-      {/* Stats summary with fixed height */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8" style={{ height: '120px' }}>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-center">
+      {/* Stats summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold mb-1">Total Objects</h3>
           <p className="text-3xl font-bold">
             {loading && page === 1 ? (
               <span className="inline-block w-12 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></span>
             ) : (
-              isDemoMode ? demoAnomalies.length : totalCount
+              totalCount
             )}
           </p>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-center">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold mb-1">Feedback Received</h3>
           <p className="text-3xl font-bold">
             {loading && page === 1 ? (
@@ -645,52 +447,33 @@ export default function AnomalyDashboard() {
           </p>
         </div>
       </div>
-
-      {/* Fixed height error section */}
-      <div style={{ height: error && !isDemoMode ? 'auto' : '0px', minHeight: '40px', overflow: 'hidden' }}>
-        {error && !isDemoMode && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
-            <p>{error}</p>
+      
+      {/* Main content - grid view only */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 min-h-[400px]">
+        {loading && page === 1 ? (
+          // Initial loading skeletons
+          renderSkeletonCards(9)
+        ) : filteredAnomalies.length > 0 ? (
+          // Render anomalies
+          filteredAnomalies.map(anomaly => (
+            <AnomalyCard
+              key={anomaly.id}
+              anomaly={anomaly}
+              onFeedbackSubmit={handleFeedbackSubmit}
+            />
+          ))
+        ) : (
+          // Empty state
+          <div className="col-span-full flex items-center justify-center h-80">
+            <p className="text-gray-500 dark:text-gray-400 text-center">
+              {searchQuery ? 'No results matching your search query.' : 'No anomalies found. Try syncing data first.'}
+            </p>
           </div>
         )}
       </div>
       
-      {/* Main content - either grid or tinder view */}
-      {viewMode === 'grid' ? (
-        // Grid view
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 min-h-[400px]">
-          {loading && page === 1 ? (
-            // Initial loading skeletons
-            renderSkeletonCards(9)
-          ) : filteredAnomalies.length > 0 ? (
-            // Render anomalies
-            filteredAnomalies.map(anomaly => (
-              <AnomalyCard
-                key={anomaly.id}
-                anomaly={anomaly}
-                onFeedbackSubmit={handleFeedbackSubmit}
-              />
-            ))
-          ) : (
-            // Empty state
-            <div className="col-span-full flex items-center justify-center h-80">
-              <p className="text-gray-500 dark:text-gray-400 text-center">
-                {searchQuery ? 'No results matching your search query.' : 'No anomalies found. Try syncing data first.'}
-              </p>
-            </div>
-          )}
-        </div>
-      ) : (
-        // Tinder view
-        <TinderStyleAnomalyView 
-          images={filteredAnomalies}
-          isLoading={loading || loadingMore}
-          onFeedbackSubmit={handleFeedbackSubmit}
-        />
-      )}
-      
-      {/* Loading indicator for infinite scroll - only show in grid view */}
-      {(viewMode === 'grid' && hasMore && !loading && anomalies.length > 0) && (
+      {/* Loading indicator for infinite scroll */}
+      {(hasMore && !loading && anomalies.length > 0) && (
         <div 
           ref={loadingRef} 
           className="flex justify-center items-center py-8 col-span-full"
