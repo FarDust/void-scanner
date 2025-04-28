@@ -21,7 +21,7 @@ const demoAnomalies: AnomalyObject[] = [
     file_path: '',
     is_anomaly: true,
     type: 'Training Example',
-    imageUrl: 'https://science.nasa.gov/wp-content/uploads/2023/04/opo0019b-jpg.webp?w=700',
+    imageUrl: 'https://science.nasa.gov/wp-content/uploads/2023/04/opo0019b-jpg.webp',
     coordinates: { ra: 83.82208, dec: -5.39111 },
     metadata: {
       objectName: 'Orion Nebula Example',
@@ -1074,63 +1074,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
 
   return (
     <div className="max-w-2xl mx-auto p-4">
-      <div className="text-center mb-8">
-        <h2 className="text-xl md:text-2xl font-bold mb-2">
-          {demoMode ? "Demo Mode: " : ""}Evaluate Astronomical Anomalies
-        </h2>
-        
-        {/* Connection Error Warning in main view */}
-        {backendConnectionFailed && (
-          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200 p-2 mb-3 rounded-md text-sm text-left">
-            <p className="flex items-center">
-              <svg className="h-5 w-5 text-yellow-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              Using demo mode: Backend connection failed
-            </p>
-          </div>
-        )}
-        
-        {/* Exit Demo Mode Button or Sync Button */}
-        <div className="flex justify-center gap-2 mt-3">
-          {demoMode ? (
-            <button
-              onClick={exitDemoMode}
-              className="inline-flex items-center text-sm bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-1 px-3 rounded-full transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L13.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-              Exit Demo Mode
-            </button>
-          ) : (
-            <button
-              onClick={() => handleSyncData(false)}
-              disabled={syncStatus.syncing}
-              className="inline-flex items-center text-sm bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 py-1 px-3 rounded-full transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-1 ${syncStatus.syncing ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 011.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-              </svg>
-              {syncStatus.syncing ? 'Syncing...' : 'Sync Data'}
-            </button>
-          )}
-          
-          {lastSyncTime && !demoMode && (
-            <span className="text-xs text-gray-500 dark:text-gray-400 self-center ml-1">
-              Last sync: {lastSyncTime.toLocaleString()}
-            </span>
-          )}
-        </div>
-      </div>
       
-      {/* Progress bar */}
-      <div className="w-full bg-gray-200 rounded-full h-2.5 mb-6 dark:bg-gray-700">
-        <div 
-          className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
-          style={{ width: `${((currentIndex) / anomalies.length) * 100}%` }}
-        ></div>
-      </div>
       
       {/* Anomaly card */}
       <div
@@ -1138,7 +1082,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
         className={`relative bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden transition-transform duration-500 transform 
           ${animateDirection === 'left' ? '-translate-x-full opacity-0' : animateDirection === 'right' ? 'translate-x-full opacity-0' : ''}`}
       >
-        <div className="relative h-72 md:h-96 w-full">
+        <div className="relative h-56 sm:h-64 md:h-72 w-full">
           {currentAnomaly.imageUrl && isValidImageUrl(currentAnomaly.imageUrl) ? (
             <Image
               src={currentAnomaly.imageUrl}
@@ -1172,9 +1116,9 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           </div>
         </div>
 
-        <div className="p-6">
-          <h3 className="text-xl font-bold mb-2">{objectName}</h3>
-          <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1 mb-5">
+        <div className="p-4">
+          <h3 className="text-lg font-bold mb-1">{objectName}</h3>
+          <div className="text-sm text-gray-500 dark:text-gray-400 space-y-0.5 mb-3">
             {coordinates && (
               <p>RA: {coordinates.ra.toFixed(5)}, Dec: {coordinates.dec.toFixed(5)}</p>
             )}
@@ -1188,7 +1132,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
             <button
               onClick={handleFindSimilar}
               disabled={fetchingSimilar}
-              className="mt-2 flex items-center space-x-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm transition-colors"
+              className="mt-1 flex items-center space-x-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm transition-colors"
             >
               {fetchingSimilar ? (
                 <>
@@ -1243,6 +1187,14 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           </div>
         </div>
       </div>
+
+      {/* Progress bar */}
+      <div className="w-full bg-gray-200 rounded-full h-1.5 mb-4 dark:bg-gray-700">
+        <div 
+          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
+          style={{ width: `${((currentIndex) / anomalies.length) * 100}%` }}
+        ></div>
+      </div>
       
       {/* Keyboard shortcuts reminder */}
       <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -1275,6 +1227,51 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
         <div className="text-center">
           <div className="font-bold text-green-500 text-xl">{stats.interesting}</div>
           <div className="text-gray-500 dark:text-gray-400">Interesting</div>
+        </div>
+      </div>
+
+      <div className="text-center mb-8">
+        {backendConnectionFailed && (
+          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200 p-2 mb-3 rounded-md text-sm text-left">
+            <p className="flex items-center">
+              <svg className="h-5 w-5 text-yellow-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              Using demo mode: Backend connection failed
+            </p>
+          </div>
+        )}
+        
+        {/* Exit Demo Mode Button or Sync Button */}
+        <div className="flex justify-center gap-2 mt-3">
+          {demoMode ? (
+            <button
+              onClick={exitDemoMode}
+              className="inline-flex items-center text-sm bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-1 px-3 rounded-full transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L13.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+              Exit Demo Mode
+            </button>
+          ) : (
+            <button
+              onClick={() => handleSyncData(false)}
+              disabled={syncStatus.syncing}
+              className="inline-flex items-center text-sm bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 py-1 px-3 rounded-full transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-1 ${syncStatus.syncing ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 011.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+              </svg>
+              {syncStatus.syncing ? 'Syncing...' : 'Sync Data'}
+            </button>
+          )}
+          
+          {lastSyncTime && !demoMode && (
+            <span className="text-xs text-gray-500 dark:text-gray-400 self-center ml-1">
+              Last sync: {lastSyncTime.toLocaleString()}
+            </span>
+          )}
         </div>
       </div>
       

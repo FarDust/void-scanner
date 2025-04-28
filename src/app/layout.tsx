@@ -30,9 +30,6 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} bg-white dark:bg-gray-900 text-gray-900 dark:text-white antialiased`}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <div className="absolute top-4 right-4 z-50">
-            <ThemeToggle />
-          </div>
           {children}
         </ThemeProvider>
       </body>
