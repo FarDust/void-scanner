@@ -18,7 +18,6 @@ const demoAnomalies: AnomalyObject[] = [
     id: 'demo-001',
     file_path: '',
     is_anomaly: true,
-    confidence: 0.87,
     type: 'Training Example',
     imageUrl: 'https://science.nasa.gov/wp-content/uploads/2023/04/opo0019b-jpg.webp?w=700',
     coordinates: { ra: 83.82208, dec: -5.39111 },
@@ -34,7 +33,6 @@ const demoAnomalies: AnomalyObject[] = [
     id: 'demo-002',
     file_path: '',
     is_anomaly: true,
-    confidence: 0.92,
     type: 'Practice Object',
     imageUrl: 'https://esahubble.org/media/archives/images/large/potw1150a.jpg',
     coordinates: { ra: 114.82542, dec: 21.12889 },
@@ -50,7 +48,6 @@ const demoAnomalies: AnomalyObject[] = [
     id: 'demo-003',
     file_path: '',
     is_anomaly: true,
-    confidence: 0.78,
     type: 'Practice Anomaly',
     imageUrl: 'https://cdn.eso.org/images/thumb700x/eso-6302.jpg',
     coordinates: { ra: 299.86542, dec: 40.73389 },
@@ -662,9 +659,6 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
                 <h3 className="text-xl font-bold">Example Anomaly</h3>
                 <p className="text-gray-600 dark:text-gray-300">Type: Unknown</p>
               </div>
-              <div className="bg-black/70 text-white px-2 py-1 rounded text-xs">
-                Confidence: 87%
-              </div>
             </div>
 
             <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1 mb-6">
@@ -799,6 +793,16 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
   const discoveryDate = currentAnomaly.metadata?.discoveryDate || 'Unknown';
   const instrument = currentAnomaly.metadata?.instrument || 'Unknown';
 
+  // Validate image URL before rendering
+  const isValidImageUrl = (url) => {
+    try {
+      const parsedUrl = new URL(url);
+      return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto p-4">
       <div className="text-center mb-8">
@@ -879,7 +883,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           ${animateDirection === 'left' ? '-translate-x-full opacity-0' : animateDirection === 'right' ? 'translate-x-full opacity-0' : ''}`}
       >
         <div className="relative h-72 md:h-96 w-full">
-          {currentAnomaly.imageUrl ? (
+          {currentAnomaly.imageUrl && isValidImageUrl(currentAnomaly.imageUrl) ? (
             <Image
               src={currentAnomaly.imageUrl}
               alt={objectName}
@@ -900,10 +904,8 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           <div className="absolute top-0 right-0 bg-black/70 text-white px-2 py-1 m-2 rounded text-xs">
             {currentAnomaly.anomaly_score !== undefined ? (
               <>Anomaly Score: {currentAnomaly.anomaly_score.toFixed(2)}</>
-            ) : currentAnomaly.confidence !== undefined ? (
-              <>Confidence: {Math.round(currentAnomaly.confidence * 100)}%</>
             ) : (
-              <>Score: N/A</>
+              <>Anomaly Score: N/A</>
             )}
           </div>
         </div>

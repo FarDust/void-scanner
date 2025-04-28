@@ -226,7 +226,7 @@
     "/sync-anomaly-data": {
       "post": {
         "summary": "Sync Anomaly Data",
-        "description": "Synchronize anomaly detection data from GCS bucket or local storage.\n\nThis endpoint loads pre-calculated anomaly detection data from either:\n- GCS: gs://fardust-portfolio/anomaly_reaper/embeddings_df.csv\n- Local: ./data/embeddings_df.csv\n\nIt checks which images are already in the database and only imports the new ones.\nNo request body is needed - the endpoint automatically detects the correct data source.\n\nReturns\n-------\nSyncAnomalyDataResponse\n    Summary of synchronization results",
+        "description": "Synchronize anomaly detection data from GCS bucket or local storage.\n\nThis endpoint loads pre-calculated anomaly detection data\n\nIt checks which images are already in the database and only imports the new ones.\nNo request body is needed - the endpoint automatically detects the correct data source.\n\nReturns\n-------\nSyncAnomalyDataResponse\n    Summary of synchronization results",
         "operationId": "sync_anomaly_data_sync_anomaly_data_post",
         "responses": {
           "200": {
@@ -241,10 +241,495 @@
           }
         }
       }
+    },
+    "/images/filter": {
+      "post": {
+        "summary": "Filter Images",
+        "description": "Advanced filtering of images with multiple criteria.\n\nThis endpoint allows filtering images by date range, anomaly score,\nclassification status, and other criteria, with pagination and sorting.\n\nParameters\n----------\nrequest : AdvancedFilterRequest\n    The filtering criteria\n\nReturns\n-------\nAdvancedFilterResponse\n    Filtered and paginated image records",
+        "operationId": "filter_images_images_filter_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AdvancedFilterRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvancedFilterResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/batch-classify": {
+      "post": {
+        "summary": "Batch Classify Images",
+        "description": "Batch classify multiple images.\n\nThis endpoint allows classifying multiple images at once with the same classification\nand optional comment.\n\nParameters\n----------\nrequest : BatchClassificationRequest\n    The batch classification request containing image IDs, classification, and optional comment\n\nReturns\n-------\nBatchClassificationResponse\n    Summary of batch classification results",
+        "operationId": "batch_classify_images_images_batch_classify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchClassificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchClassificationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/stats": {
+      "get": {
+        "summary": "Dashboard Stats",
+        "description": "Get comprehensive statistics for dashboard visualization.\n\nThis endpoint provides detailed statistics about anomaly detection results,\nincluding model performance metrics based on user feedback.\n\nReturns\n-------\nDashboardStatsResponse\n    Detailed dashboard statistics",
+        "operationId": "dashboard_stats_dashboard_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}/classifications": {
+      "get": {
+        "summary": "Get Classification History",
+        "description": "Get the complete classification history for a specific image.\n\nThis endpoint returns all user classifications that have been made for a specific image,\nordered by timestamp (most recent first).\n\nParameters\n----------\nimage_id : str\n    ID of the image to get classifications for\n\nReturns\n-------\nClassificationHistoryResponse\n    Classification history for the image",
+        "operationId": "get_classification_history_images__image_id__classifications_get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "title": "Image Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassificationHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/export": {
+      "post": {
+        "summary": "Export Data",
+        "description": "Export anomaly detection data in CSV or JSON format.\n\nThis endpoint allows exporting filtered data for further analysis or reporting.\nThe export can be filtered using the same criteria as the advanced filter endpoint.\n\nParameters\n----------\nrequest : ExportRequest\n    Export configuration including format, filters, and options\n\nReturns\n-------\nFileResponse\n    File containing the exported data",
+        "operationId": "export_data_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ExportRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}/similar": {
+      "post": {
+        "summary": "Find Similar Anomalies",
+        "description": "Find images with similar anomaly patterns to a reference image.\n\nThis endpoint finds images that exhibit similar anomaly patterns to the\nspecified reference image, using anomaly score and reconstruction error.\n\nParameters\n----------\nimage_id : str\n    ID of the reference image to find similar anomalies for\nrequest : SimilarAnomaliesRequest\n    Request parameters including limit and minimum similarity score\n\nReturns\n-------\nSimilarAnomaliesResponse\n    List of similar images with similarity scores",
+        "operationId": "find_similar_anomalies_images__image_id__similar_post",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "title": "Image Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimilarAnomaliesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimilarAnomaliesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{image_id}/visualization": {
+      "get": {
+        "summary": "Get Image Visualization",
+        "description": "Get visualizations for a specific image including:\n- Original image\n- Heatmap visualization of anomaly regions\n- Bounding box visualization of detected anomalies\n\nParameters\n----------\nimage_id : str\n    ID of the image to visualize\n\nReturns\n-------\nAnomalyVisualizationResponse\n    Multiple visualization types for the image",
+        "operationId": "get_image_visualization_images__image_id__visualization_get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "title": "Image Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnomalyVisualizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/visualizations/pca-projection": {
+      "post": {
+        "summary": "Generate Pca Projection Visualization",
+        "description": "Generate a PCA projection visualization of all images.\n\nThis endpoint provides a 2D visualization of the PCA projection\nof image embeddings, showing the clustering of normal images and anomalies.\n\nParameters\n----------\nrequest : PCAProjectionRequest, optional\n    Optional request parameters for customizing the visualization\n\nReturns\n-------\nPCAProjectionResponse\n    Visualization and related data",
+        "operationId": "generate_pca_projection_visualization_visualizations_pca_projection_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PCAProjectionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PCAProjectionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdvancedFilterRequest": {
+        "properties": {
+          "date_range": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/DateRangeFilterRequest" },
+              { "type": "null" }
+            ]
+          },
+          "anomaly_score": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/AnomalyScoreFilterRequest" },
+              { "type": "null" }
+            ]
+          },
+          "classification": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/ClassificationFilterRequest" },
+              { "type": "null" }
+            ]
+          },
+          "is_anomaly": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Is Anomaly"
+          },
+          "page": { "type": "integer", "title": "Page", "default": 1 },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "default": 50
+          },
+          "sort_by": {
+            "type": "string",
+            "title": "Sort By",
+            "default": "processed_at"
+          },
+          "sort_order": {
+            "type": "string",
+            "title": "Sort Order",
+            "default": "desc"
+          }
+        },
+        "type": "object",
+        "title": "AdvancedFilterRequest",
+        "description": "Pydantic model for advanced image filtering.\n\nAttributes\n----------\ndate_range : Optional[DateRangeFilterRequest]\n    Filter by date range\nanomaly_score : Optional[AnomalyScoreFilterRequest]\n    Filter by anomaly score range\nclassification : Optional[ClassificationFilterRequest]\n    Filter by classification status\nis_anomaly : Optional[bool]\n    Filter by model-detected anomaly status\npage : int\n    Page number for pagination\npage_size : int\n    Number of results per page\nsort_by : str\n    Field to sort results by\nsort_order : str\n    Sort order (\"asc\" or \"desc\")",
+        "examples": [
+          {
+            "anomaly_score": { "max_score": 1.0, "min_score": 0.5 },
+            "classification": {
+              "is_classified": true,
+              "user_classification": true
+            },
+            "date_range": {
+              "end_date": "2025-04-25T23:59:59.999Z",
+              "start_date": "2025-03-25T00:00:00.000Z"
+            },
+            "is_anomaly": true,
+            "page": 1,
+            "page_size": 50,
+            "sort_by": "anomaly_score",
+            "sort_order": "desc"
+          }
+        ]
+      },
+      "AdvancedFilterResponse": {
+        "properties": {
+          "results": {
+            "items": { "$ref": "#/components/schemas/ImageResponse" },
+            "type": "array",
+            "title": "Results"
+          },
+          "total_count": { "type": "integer", "title": "Total Count" },
+          "page": { "type": "integer", "title": "Page" },
+          "page_size": { "type": "integer", "title": "Page Size" },
+          "total_pages": { "type": "integer", "title": "Total Pages" }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "total_count",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "AdvancedFilterResponse",
+        "description": "Pydantic model for advanced filter response.\n\nAttributes\n----------\nresults : List[ImageResponse]\n    List of image records matching the filter criteria\ntotal_count : int\n    Total number of records matching the criteria\npage : int\n    Current page number\npage_size : int\n    Number of results per page\ntotal_pages : int\n    Total number of pages",
+        "examples": [
+          {
+            "page": 1,
+            "page_size": 50,
+            "results": [
+              {
+                "anomaly_score": 2.5,
+                "filename": "example.jpg",
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "is_anomaly": true,
+                "path": "/uploads/550e8400-e29b-41d4-a716-446655440000.jpg",
+                "reconstruction_error": 0.123,
+                "timestamp": "2025-04-25T12:34:56.789Z"
+              }
+            ],
+            "total_count": 150,
+            "total_pages": 3
+          }
+        ]
+      },
+      "AnomalyScoreFilterRequest": {
+        "properties": {
+          "min_score": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Min Score"
+          },
+          "max_score": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Max Score"
+          }
+        },
+        "type": "object",
+        "title": "AnomalyScoreFilterRequest",
+        "description": "Pydantic model for anomaly score range filtering.\n\nAttributes\n----------\nmin_score : Optional[float]\n    Minimum anomaly score (inclusive)\nmax_score : Optional[float]\n    Maximum anomaly score (inclusive)",
+        "examples": [{ "max_score": 1.0, "min_score": 0.5 }]
+      },
+      "AnomalyVisualizationResponse": {
+        "properties": {
+          "image_id": { "type": "string", "title": "Image Id" },
+          "visualizations": {
+            "items": {
+              "$ref": "#/components/schemas/ImageVisualizationResponse"
+            },
+            "type": "array",
+            "title": "Visualizations"
+          },
+          "reconstruction_error": {
+            "type": "number",
+            "title": "Reconstruction Error"
+          },
+          "is_anomaly": { "type": "boolean", "title": "Is Anomaly" },
+          "anomaly_score": { "type": "number", "title": "Anomaly Score" }
+        },
+        "type": "object",
+        "required": [
+          "image_id",
+          "visualizations",
+          "reconstruction_error",
+          "is_anomaly",
+          "anomaly_score"
+        ],
+        "title": "AnomalyVisualizationResponse",
+        "description": "Pydantic model for anomaly visualization response.\n\nAttributes\n----------\nimage_id : str\n    ID of the image\nvisualizations : List[ImageVisualizationResponse]\n    List of visualizations for this image\nreconstruction_error : float\n    PCA reconstruction error for the image\nis_anomaly : bool\n    Whether the image was classified as an anomaly\nanomaly_score : float\n    Normalized anomaly score (0-1)",
+        "examples": [
+          {
+            "anomaly_score": 0.85,
+            "image_id": "550e8400-e29b-41d4-a716-446655440000",
+            "is_anomaly": true,
+            "reconstruction_error": 0.15,
+            "visualizations": [
+              {
+                "image_data": "base64_encoded_image_data...",
+                "image_id": "550e8400-e29b-41d4-a716-446655440000",
+                "visualization_type": "original"
+              },
+              {
+                "image_data": "base64_encoded_image_data...",
+                "image_id": "550e8400-e29b-41d4-a716-446655440000",
+                "visualization_type": "anomaly_heatmap"
+              }
+            ]
+          }
+        ]
+      },
+      "BatchClassificationRequest": {
+        "properties": {
+          "image_ids": {
+            "items": { "type": "string" },
+            "type": "array",
+            "title": "Image Ids"
+          },
+          "is_anomaly": { "type": "boolean", "title": "Is Anomaly" },
+          "comment": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": ["image_ids", "is_anomaly"],
+        "title": "BatchClassificationRequest",
+        "description": "Pydantic model for batch classification request.\n\nAttributes\n----------\nimage_ids : List[str]\n    List of image IDs to classify\nis_anomaly : bool\n    Whether the images are anomalous (True) or normal (False)\ncomment : Optional[str]\n    Optional comment to apply to all classifications",
+        "examples": [
+          {
+            "comment": "Batch classification of multiple similar anomalies",
+            "image_ids": [
+              "550e8400-e29b-41d4-a716-446655440000",
+              "650e8400-e29b-41d4-a716-446655440001"
+            ],
+            "is_anomaly": true
+          }
+        ]
+      },
+      "BatchClassificationResponse": {
+        "properties": {
+          "total": { "type": "integer", "title": "Total" },
+          "successful": { "type": "integer", "title": "Successful" },
+          "failed": { "type": "integer", "title": "Failed" },
+          "failed_ids": {
+            "items": { "type": "string" },
+            "type": "array",
+            "title": "Failed Ids"
+          }
+        },
+        "type": "object",
+        "required": ["total", "successful", "failed", "failed_ids"],
+        "title": "BatchClassificationResponse",
+        "description": "Pydantic model for batch classification response.\n\nAttributes\n----------\ntotal : int\n    Total number of images in the request\nsuccessful : int\n    Number of images successfully classified\nfailed : int\n    Number of images that failed to be classified\nfailed_ids : List[str]\n    List of image IDs that failed to be classified",
+        "examples": [
+          { "failed": 0, "failed_ids": [], "successful": 2, "total": 2 }
+        ]
+      },
       "Body_process_single_image_process_post": {
         "properties": {
           "file": { "type": "string", "format": "binary", "title": "File" }
@@ -252,6 +737,210 @@
         "type": "object",
         "required": ["file"],
         "title": "Body_process_single_image_process_post"
+      },
+      "ClassificationFilterRequest": {
+        "properties": {
+          "is_classified": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Is Classified"
+          },
+          "user_classification": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "User Classification"
+          }
+        },
+        "type": "object",
+        "title": "ClassificationFilterRequest",
+        "description": "Pydantic model for classification status filtering.\n\nAttributes\n----------\nis_classified : Optional[bool]\n    Whether the image has been classified by a user\nuser_classification : Optional[bool]\n    Filter by user classification (True for anomaly, False for normal)",
+        "examples": [{ "is_classified": true, "user_classification": true }]
+      },
+      "ClassificationHistoryResponse": {
+        "properties": {
+          "image_id": { "type": "string", "title": "Image Id" },
+          "classifications": {
+            "items": { "$ref": "#/components/schemas/ClassificationResponse" },
+            "type": "array",
+            "title": "Classifications"
+          }
+        },
+        "type": "object",
+        "required": ["image_id", "classifications"],
+        "title": "ClassificationHistoryResponse",
+        "description": "Pydantic model for image classification history.\n\nAttributes\n----------\nimage_id : str\n    ID of the image\nclassifications : List[ClassificationResponse]\n    List of all classifications for this image",
+        "examples": [
+          {
+            "classifications": [
+              {
+                "comment": "Initial classification",
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "image_id": "550e8400-e29b-41d4-a716-446655440000",
+                "timestamp": "2025-04-25T12:34:56.789Z",
+                "user_classification": true
+              },
+              {
+                "comment": "After further review, this is not an anomaly",
+                "id": "650e8400-e29b-41d4-a716-446655440000",
+                "image_id": "550e8400-e29b-41d4-a716-446655440000",
+                "timestamp": "2025-04-26T09:12:34.567Z",
+                "user_classification": false
+              }
+            ],
+            "image_id": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ]
+      },
+      "ClassificationResponse": {
+        "properties": {
+          "id": { "type": "string", "title": "Id" },
+          "image_id": { "type": "string", "title": "Image Id" },
+          "user_classification": {
+            "type": "boolean",
+            "title": "User Classification"
+          },
+          "comment": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Comment"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "image_id",
+          "user_classification",
+          "comment",
+          "timestamp"
+        ],
+        "title": "ClassificationResponse",
+        "description": "Pydantic model for classification response data.\n\nThis model defines the structure of the API response when returning\ninformation about an image classification.\n\nAttributes\n----------\nid : str\n    Unique identifier for the classification\nimage_id : str\n    ID of the classified image\nuser_classification : bool\n    User's classification (True for anomaly, False for normal)\ncomment : str, optional\n    Optional comment about the classification\ntimestamp : datetime\n    When the classification was made\n\nExamples\n--------\n>>> classification_response = ClassificationResponse(\n...     id=\"550e8400-e29b-41d4-a716-446655440000\",\n...     image_id=\"550e8400-e29b-41d4-a716-446655440000\",\n...     user_classification=True,\n...     comment=\"This image shows an unusual pattern in the top right corner.\",\n...     timestamp=datetime.datetime.now()\n... )\n>>> print(classification_response.user_classification)\nTrue",
+        "examples": [
+          {
+            "comment": "This image shows an unusual pattern in the top right corner.",
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "image_id": "550e8400-e29b-41d4-a716-446655440000",
+            "timestamp": "2025-04-25T12:34:56.789Z",
+            "user_classification": true
+          }
+        ]
+      },
+      "DashboardStatsResponse": {
+        "properties": {
+          "total_images": { "type": "integer", "title": "Total Images" },
+          "total_anomalies": { "type": "integer", "title": "Total Anomalies" },
+          "user_confirmed_anomalies": {
+            "type": "integer",
+            "title": "User Confirmed Anomalies"
+          },
+          "unclassified_anomalies": {
+            "type": "integer",
+            "title": "Unclassified Anomalies"
+          },
+          "false_positives": { "type": "integer", "title": "False Positives" },
+          "false_negatives": { "type": "integer", "title": "False Negatives" },
+          "recent_activity": {
+            "items": { "additionalProperties": true, "type": "object" },
+            "type": "array",
+            "title": "Recent Activity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_images",
+          "total_anomalies",
+          "user_confirmed_anomalies",
+          "unclassified_anomalies",
+          "false_positives",
+          "false_negatives",
+          "recent_activity"
+        ],
+        "title": "DashboardStatsResponse",
+        "description": "Pydantic model for dashboard statistics response.\n\nAttributes\n----------\ntotal_images : int\n    Total number of images in the system\ntotal_anomalies : int\n    Total number of detected anomalies\nuser_confirmed_anomalies : int\n    Number of user-confirmed anomalies\nunclassified_anomalies : int\n    Number of anomalies not yet classified by users\nfalse_positives : int\n    Number of model anomalies classified as normal by users\nfalse_negatives : int\n    Number of model normal classified as anomalies by users\nrecent_activity : List[Dict]\n    Recent classification activity",
+        "examples": [
+          {
+            "false_negatives": 3,
+            "false_positives": 5,
+            "recent_activity": [
+              {
+                "action": "classification",
+                "is_anomaly": true,
+                "timestamp": "2025-04-25T12:34:56.789Z"
+              }
+            ],
+            "total_anomalies": 25,
+            "total_images": 150,
+            "unclassified_anomalies": 10,
+            "user_confirmed_anomalies": 15
+          }
+        ]
+      },
+      "DateRangeFilterRequest": {
+        "properties": {
+          "start_date": {
+            "anyOf": [
+              { "type": "string", "format": "date-time" },
+              { "type": "null" }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              { "type": "string", "format": "date-time" },
+              { "type": "null" }
+            ],
+            "title": "End Date"
+          }
+        },
+        "type": "object",
+        "title": "DateRangeFilterRequest",
+        "description": "Pydantic model for date range filtering.\n\nAttributes\n----------\nstart_date : Optional[datetime.datetime]\n    Start date for filtering (inclusive)\nend_date : Optional[datetime.datetime]\n    End date for filtering (inclusive)",
+        "examples": [
+          {
+            "end_date": "2025-04-25T23:59:59.999Z",
+            "start_date": "2025-03-25T00:00:00.000Z"
+          }
+        ]
+      },
+      "ExportFormat": {
+        "type": "string",
+        "enum": ["json", "csv"],
+        "title": "ExportFormat",
+        "description": "Enum for export format options."
+      },
+      "ExportRequest": {
+        "properties": {
+          "format": {
+            "$ref": "#/components/schemas/ExportFormat",
+            "default": "json"
+          },
+          "filter": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/AdvancedFilterRequest" },
+              { "type": "null" }
+            ]
+          },
+          "include_classifications": {
+            "type": "boolean",
+            "title": "Include Classifications",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "ExportRequest",
+        "description": "Pydantic model for exporting data.\n\nAttributes\n----------\nformat : ExportFormat\n    Format for export (JSON or CSV)\nfilter : Optional[AdvancedFilterRequest]\n    Optional filter to apply before export\ninclude_classifications : bool\n    Whether to include user classifications in export",
+        "examples": [
+          {
+            "filter": {
+              "date_range": { "start_date": "2025-03-25T00:00:00.000Z" },
+              "is_anomaly": true
+            },
+            "format": "csv",
+            "include_classifications": true
+          }
+        ]
       },
       "HTTPValidationError": {
         "properties": {
@@ -372,6 +1061,199 @@
             "path": "/uploads/550e8400-e29b-41d4-a716-446655440000.jpg",
             "reconstruction_error": 0.123,
             "timestamp": "2025-04-25T12:34:56.789Z"
+          }
+        ]
+      },
+      "ImageVisualizationResponse": {
+        "properties": {
+          "image_id": { "type": "string", "title": "Image Id" },
+          "visualization_type": {
+            "$ref": "#/components/schemas/ImageVisualizationType"
+          },
+          "image_data": { "type": "string", "title": "Image Data" }
+        },
+        "type": "object",
+        "required": ["image_id", "visualization_type", "image_data"],
+        "title": "ImageVisualizationResponse",
+        "description": "Pydantic model for image visualization response.\n\nAttributes\n----------\nimage_id : str\n    ID of the image\nvisualization_type : ImageVisualizationType\n    Type of visualization\nimage_data : str\n    Base64-encoded image data",
+        "examples": [
+          {
+            "image_data": "base64_encoded_image_data...",
+            "image_id": "550e8400-e29b-41d4-a716-446655440000",
+            "visualization_type": "anomaly_heatmap"
+          }
+        ]
+      },
+      "ImageVisualizationType": {
+        "type": "string",
+        "enum": ["original", "processed", "anomaly_heatmap", "bounding_box"],
+        "title": "ImageVisualizationType",
+        "description": "Enum for image visualization types."
+      },
+      "PCAProjectionRequest": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/AdvancedFilterRequest" },
+              { "type": "null" }
+            ]
+          },
+          "highlight_anomalies": {
+            "type": "boolean",
+            "title": "Highlight Anomalies",
+            "default": true
+          },
+          "use_interactive": {
+            "type": "boolean",
+            "title": "Use Interactive",
+            "default": false
+          },
+          "include_image_paths": {
+            "type": "boolean",
+            "title": "Include Image Paths",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PCAProjectionRequest",
+        "description": "Pydantic model for PCA projection request.\n\nAttributes\n----------\nfilter : Optional[AdvancedFilterRequest]\n    Optional filter to apply before generating projection\nhighlight_anomalies : bool\n    Whether to highlight anomalies in the projection\nuse_interactive : bool\n    Whether to use interactive Plotly visualization\ninclude_image_paths : bool\n    Whether to include image paths in the response data",
+        "examples": [
+          {
+            "filter": { "is_anomaly": true },
+            "highlight_anomalies": true,
+            "include_image_paths": false,
+            "use_interactive": true
+          }
+        ]
+      },
+      "PCAProjectionResponse": {
+        "properties": {
+          "visualization": { "type": "string", "title": "Visualization" },
+          "projection_data": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Projection Data"
+          },
+          "anomaly_threshold": {
+            "type": "number",
+            "title": "Anomaly Threshold"
+          },
+          "total_points": { "type": "integer", "title": "Total Points" },
+          "anomaly_count": { "type": "integer", "title": "Anomaly Count" },
+          "is_interactive": {
+            "type": "boolean",
+            "title": "Is Interactive",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "visualization",
+          "anomaly_threshold",
+          "total_points",
+          "anomaly_count"
+        ],
+        "title": "PCAProjectionResponse",
+        "description": "Pydantic model for PCA projection response.\n\nAttributes\n----------\nvisualization : str\n    Base64-encoded visualization image (PNG or HTML for interactive)\nprojection_data : Optional[dict]\n    Raw projection data including coordinates and metadata\nanomaly_threshold : float\n    Threshold used for anomaly detection\ntotal_points : int\n    Total number of points in the projection\nanomaly_count : int\n    Number of anomalies in the projection",
+        "examples": [
+          {
+            "anomaly_count": 10,
+            "anomaly_threshold": 0.1,
+            "is_interactive": false,
+            "projection_data": {
+              "anomalies": [
+                { "error": 0.15, "is_anomaly": true, "x": 0.8, "y": 0.9 }
+              ],
+              "points": [
+                { "error": 0.05, "is_anomaly": false, "x": 0.1, "y": 0.2 }
+              ]
+            },
+            "total_points": 100,
+            "visualization": "base64_encoded_image_data..."
+          }
+        ]
+      },
+      "SimilarAnomaliesRequest": {
+        "properties": {
+          "image_id": { "type": "string", "title": "Image Id" },
+          "limit": { "type": "integer", "title": "Limit", "default": 10 },
+          "min_score": {
+            "type": "number",
+            "title": "Min Score",
+            "default": 0.5
+          }
+        },
+        "type": "object",
+        "required": ["image_id"],
+        "title": "SimilarAnomaliesRequest",
+        "description": "Pydantic model for finding similar anomalies.\n\nAttributes\n----------\nimage_id : str\n    Reference image ID to find similar anomalies for\nlimit : int\n    Maximum number of similar anomalies to return\nmin_score : float\n    Minimum similarity score threshold (0-1)",
+        "examples": [
+          {
+            "image_id": "550e8400-e29b-41d4-a716-446655440000",
+            "limit": 5,
+            "min_score": 0.7
+          }
+        ]
+      },
+      "SimilarAnomaliesResponse": {
+        "properties": {
+          "reference_image_id": {
+            "type": "string",
+            "title": "Reference Image Id"
+          },
+          "similar_images": {
+            "items": { "$ref": "#/components/schemas/SimilarityResult" },
+            "type": "array",
+            "title": "Similar Images"
+          }
+        },
+        "type": "object",
+        "required": ["reference_image_id", "similar_images"],
+        "title": "SimilarAnomaliesResponse",
+        "description": "Pydantic model for similar anomalies response.\n\nAttributes\n----------\nreference_image_id : str\n    ID of the reference image\nsimilar_images : List[SimilarityResult]\n    List of similar images with similarity scores",
+        "examples": [
+          {
+            "reference_image_id": "550e8400-e29b-41d4-a716-446655440000",
+            "similar_images": [
+              {
+                "image": {
+                  "anomaly_score": 2.3,
+                  "filename": "similar1.jpg",
+                  "id": "650e8400-e29b-41d4-a716-446655440000",
+                  "is_anomaly": true,
+                  "path": "/uploads/650e8400-e29b-41d4-a716-446655440000.jpg",
+                  "reconstruction_error": 0.125,
+                  "timestamp": "2025-04-25T12:34:56.789Z"
+                },
+                "similarity_score": 0.92
+              }
+            ]
+          }
+        ]
+      },
+      "SimilarityResult": {
+        "properties": {
+          "image": { "$ref": "#/components/schemas/ImageResponse" },
+          "similarity_score": { "type": "number", "title": "Similarity Score" }
+        },
+        "type": "object",
+        "required": ["image", "similarity_score"],
+        "title": "SimilarityResult",
+        "description": "Pydantic model for a single similarity result.\n\nAttributes\n----------\nimage : ImageResponse\n    The similar image\nsimilarity_score : float\n    Score indicating similarity to the reference image (0-1)",
+        "examples": [
+          {
+            "image": {
+              "anomaly_score": 2.3,
+              "filename": "similar.jpg",
+              "id": "650e8400-e29b-41d4-a716-446655440000",
+              "is_anomaly": true,
+              "path": "/uploads/650e8400-e29b-41d4-a716-446655440000.jpg",
+              "reconstruction_error": 0.125,
+              "timestamp": "2025-04-25T12:34:56.789Z"
+            },
+            "similarity_score": 0.92
           }
         ]
       },

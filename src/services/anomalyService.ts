@@ -12,7 +12,6 @@ export interface AnomalyObject {
   path?: string;
   
   // Additional fields for our frontend
-  confidence?: number;
   classification?: string;
   comment?: string;
   type?: string;
@@ -397,10 +396,13 @@ export const getStatistics = async (): Promise<{
  * Process a single image for anomaly detection
  */
 export const processImage = async (imageFile: File): Promise<{
-  image_id: string;
+  id: string;
+  filename: string;
+  timestamp: string;
+  reconstruction_error: number;
   is_anomaly: boolean;
-  confidence: number;
-  processing_time: number;
+  anomaly_score: number;
+  path: string;
 }> => {
   try {
     const formData = new FormData();

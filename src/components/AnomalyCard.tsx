@@ -69,12 +69,6 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
     }
   };
 
-  const confidenceLevel = Math.round((anomaly.confidence || 0) * 100);
-  const confidenceColor = 
-    confidenceLevel > 90 ? 'bg-green-500' : 
-    confidenceLevel > 70 ? 'bg-blue-500' : 
-    confidenceLevel > 50 ? 'bg-yellow-500' : 'bg-red-500';
-
   return (
     <div className="group bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden w-full max-w-md border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700">
       <div className="relative h-64 w-full overflow-hidden">
@@ -102,9 +96,6 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
           </div>
           
           <div className="flex flex-col items-end gap-2">
-            <div className="bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs font-medium">
-              Confidence: {confidenceLevel}%
-            </div>
             
             {anomaly.is_anomaly && (
               <div className="bg-amber-500/90 backdrop-blur-sm text-white px-2 py-1 rounded text-xs font-medium animate-pulse">
@@ -140,20 +131,6 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
             </svg>
             Instrument: {anomaly.metadata?.instrument || 'Unknown'}
           </p>
-        </div>
-        
-        {/* Confidence bar */}
-        <div className="mb-4">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="font-medium text-gray-700 dark:text-gray-300">Anomaly Confidence</span>
-            <span className="font-semibold text-gray-900 dark:text-gray-100">{confidenceLevel}%</span>
-          </div>
-          <div className="h-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div 
-              className={`h-full ${confidenceColor} transition-all duration-500`}
-              style={{ width: `${confidenceLevel}%` }}
-            ></div>
-          </div>
         </div>
         
         {/* User feedback section */}

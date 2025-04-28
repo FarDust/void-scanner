@@ -19,7 +19,6 @@ export default function ImageUploader() {
     anomaly_score: number;
     path: string;
     // Frontend-specific fields can be optional
-    confidence?: number;
     imageUrl?: string;
     processing_time?: number;
   } | null>(null);
