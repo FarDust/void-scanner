@@ -465,27 +465,23 @@ export const processImage = async (imageFile: File): Promise<{
 /**
  * Submit batch classification for multiple images at once
  */
-export const batchClassifyImages = async (
-  imageIds: string[],
-  isAnomaly: boolean,
-  comment?: string
-): Promise<{
+export const submitBatchClassification = async (request: {
+  image_ids: string[];
+  is_anomaly: boolean;
+  comment?: string;
+}): Promise<{
   total: number;
   successful: number;
   failed: number;
-  failedIds: string[];
+  failed_ids: string[];
 }> => {
   try {
     const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.BATCH_CLASSIFY}`, {
-      method: 'PATCH', // Note: using PATCH as specified in the API
+      method: 'PATCH', // Using PATCH as specified in the OpenAPI spec
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        image_ids: imageIds,
-        is_anomaly: isAnomaly,
-        comment: comment || ''
-      }),
+      body: JSON.stringify(request),
     });
     
     if (!response.ok) {
@@ -494,19 +490,14 @@ export const batchClassifyImages = async (
     
     const data = await response.json();
     return {
-      total: data.total || imageIds.length,
+      total: data.total || 0,
       successful: data.successful || 0,
-      failed: data.failed || imageIds.length,
-      failedIds: data.failed_ids || []
+      failed: data.failed || 0,
+      failed_ids: data.failed_ids || []
     };
   } catch (err) {
     console.error('Error in batch classification:', err);
-    return {
-      total: imageIds.length,
-      successful: 0,
-      failed: imageIds.length,
-      failedIds: imageIds
-    };
+    throw new Error(err?.message || 'An error occurred while submitting batch classification');
   }
 };
 

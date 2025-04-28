@@ -6,9 +6,11 @@ import {
   AnomalyObject, 
   getAnomalies, 
   getNormalImages, 
-  submitAnomalyFeedback, 
+  submitAnomalyFeedback,
+  submitBatchClassification, // Import the new batch classification function
   getStatistics,
-  syncAnomalyData 
+  syncAnomalyData,
+  getSimilarImages // Import the new getSimilarImages function
 } from '../services/anomalyService';
 import { useImageCache } from '../services/imageCache';
 
@@ -76,6 +78,10 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
   const [apiStats, setApiStats] = useState<any>(null);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showDetailedForm, setShowDetailedForm] = useState(false);
+  const [showBatchClassifyForm, setShowBatchClassifyForm] = useState(false); // New state for batch classify form
+  const [selectedAnomalies, setSelectedAnomalies] = useState<string[]>([]); // New state to track selected anomalies
+  const [batchClassifyComment, setBatchClassifyComment] = useState(''); // New state for batch comment
+  const [batchClassifyType, setBatchClassifyType] = useState<'interesting' | 'not_interesting'>('interesting'); // New state for batch type
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -95,6 +101,52 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
   // New state for preloaded images
   const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
 
+  // Add a useEffect to preload images when anomalies change
+  useEffect(() => {
+    if (!anomalies.length) return;
+    
+    // Collect all image URLs that need preloading
+    const imageUrls = anomalies
+      .filter(anomaly => anomaly.imageUrl && !preloadedImages.has(anomaly.imageUrl))
+      .map(anomaly => anomaly.imageUrl);
+    
+    if (imageUrls.length === 0) return;
+    
+    // Preload the images with priority to the next few images
+    const preloadWithPriority = async () => {
+      // First preload the next 3 images in sequence for quick access
+      const priorityUrls = imageUrls.slice(currentIndex, currentIndex + 3);
+      if (priorityUrls.length > 0) {
+        await preloadImages(priorityUrls, false); // false = sequential loading
+        
+        // Update preloaded images record
+        const newPreloadedSet = new Set(preloadedImages);
+        priorityUrls.forEach(url => newPreloadedSet.add(url));
+        setPreloadedImages(newPreloadedSet);
+      }
+      
+      // Then preload the rest in parallel
+      const remainingUrls = imageUrls.slice(currentIndex + 3);
+      if (remainingUrls.length > 0) {
+        preloadImages(remainingUrls, true); // true = parallel loading
+        
+        // Update preloaded images record
+        const newPreloadedSet = new Set(preloadedImages);
+        remainingUrls.forEach(url => newPreloadedSet.add(url));
+        setPreloadedImages(newPreloadedSet);
+      }
+    };
+    
+    preloadWithPriority();
+  }, [anomalies, currentIndex, preloadImages, preloadedImages]);
+
+  // Cache statistics monitor (optional but useful for debugging)
+  useEffect(() => {
+    if (cacheStats.hits > 0 || cacheStats.misses > 0) {
+      console.log('Image Cache Stats:', cacheStats);
+    }
+  }, [cacheStats]);
+
   const [syncStatus, setSyncStatus] = useState<{
     syncing: boolean;
     message: string | null;
@@ -104,6 +156,14 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
     message: null,
     success: null
   });
+
+  // Add this new state for similar images modal
+  const [showSimilarImages, setShowSimilarImages] = useState(false);
+  const [similarImages, setSimilarImages] = useState<Array<{
+    image: AnomalyObject;
+    similarity_score: number;
+  }>>([]);
+  const [fetchingSimilar, setFetchingSimilar] = useState(false);
   
   const startDemoMode = () => {
     setAnomalies([...demoAnomalies]);
@@ -226,12 +286,56 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
     }
   };
 
-  // Fix handleKeyNavigation dependencies and function calls
-  const handleKeyNavigation = useCallback((e: KeyboardEvent) => {
-    if (loading || anomalies.length === 0) return;
+  // Add this function to fetch similar images - moved above handleKeyNavigation
+  const handleFindSimilar = async () => {
+    if (!currentAnomaly?.id || fetchingSimilar) return;
     
-    // Don't handle keyboard shortcuts when a form is being filled out
-    if (showDetailedForm) return;
+    setFetchingSimilar(true);
+    try {
+      if (demoMode) {
+        // In demo mode, just show a few of the other demo images
+        setTimeout(() => {
+          setSimilarImages(
+            demoAnomalies
+              .filter(a => a.id !== currentAnomaly.id)
+              .map(image => ({ 
+                image, 
+                similarity_score: Math.random() * 0.5 + 0.5 // Random score between 0.5-1.0
+              }))
+          );
+          setShowSimilarImages(true);
+          setFetchingSimilar(false);
+        }, 1000);
+      } else {
+        // In real mode, call the API
+        const result = await getSimilarImages(currentAnomaly.id, 6, 0.3);
+        setSimilarImages(result.similar_images || []);
+        setShowSimilarImages(true);
+        setFetchingSimilar(false);
+      }
+    } catch (err) {
+      console.error('Error fetching similar images:', err);
+      setFetchingSimilar(false);
+      alert('Failed to find similar images.');
+    }
+  };
+
+  // Improved keyboard navigation handler with support for all actions
+  const handleKeyNavigation = useCallback((e: KeyboardEvent) => {
+    // Don't handle keyboard shortcuts when any modal is open
+    if (showDetailedForm || showBatchClassifyForm || showSimilarImages || showKeyboardShortcuts) {
+      if (e.key === 'Escape') {
+        // Allow Escape to close modals
+        if (showKeyboardShortcuts) setShowKeyboardShortcuts(false);
+        if (showSimilarImages) setShowSimilarImages(false);
+        if (showBatchClassifyForm) setShowBatchClassifyForm(false);
+        if (showDetailedForm) setShowDetailedForm(false);
+      }
+      return;
+    }
+    
+    // Main keyboard navigation when no modals are open
+    if (loading || anomalies.length === 0) return;
     
     switch (e.key) {
       case 'ArrowLeft':
@@ -241,8 +345,17 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
         handleInteresting();
         break;
       case 'ArrowDown':
-      case 'd': // Keep 'd' key as an alternative
+      case 'd': 
         setShowDetailedForm(true);
+        break;
+      case 'b': 
+        setShowBatchClassifyForm(true);
+        break;
+      case 's': 
+        handleFindSimilar();
+        break;
+      case 'k': 
+        setShowKeyboardShortcuts(true);
         break;
       case 'Escape':
         if (demoMode) exitDemoMode();
@@ -250,7 +363,11 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
       default:
         break;
     }
-  }, [loading, anomalies.length, showDetailedForm, demoMode, exitDemoMode, handleNotInteresting, handleInteresting]);
+  }, [
+    loading, anomalies.length, demoMode, exitDemoMode,
+    handleNotInteresting, handleInteresting, handleFindSimilar,
+    showDetailedForm, showBatchClassifyForm, showSimilarImages, showKeyboardShortcuts
+  ]);
   
   // Set up automatic sync every 120 minutes
   useEffect(() => {
@@ -526,6 +643,85 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
     }
   };
 
+  // Similar Images Modal - Improved UI and keyboard navigation
+  const renderSimilarImagesModal = () => {
+    if (!showSimilarImages) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div 
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto animate-fade-in"
+          tabIndex={-1} // Make div focusable
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setShowSimilarImages(false);
+            // Tab trap inside modal
+            if (e.key === 'Tab') {
+              const focusableElements = e.currentTarget.querySelectorAll(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+              );
+              const firstElement = focusableElements[0] as HTMLElement;
+              const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+              
+              if (e.shiftKey && document.activeElement === firstElement) {
+                e.preventDefault();
+                lastElement.focus();
+              } else if (!e.shiftKey && document.activeElement === lastElement) {
+                e.preventDefault();
+                firstElement.focus();
+              }
+            }
+          }}
+        >
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-bold">Similar Images</h3>
+            <button 
+              onClick={() => setShowSimilarImages(false)}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"
+              aria-label="Close modal"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {fetchingSimilar ? (
+            <div className="flex flex-col items-center justify-center p-10">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-300">Finding similar anomalies...</p>
+            </div>
+          ) : similarImages.length === 0 ? (
+            <div className="text-center py-10">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <p className="text-gray-600 dark:text-gray-300">No similar images found.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              {similarImages.map((img, index) => (
+                <div key={index} className="relative h-32 w-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden rounded">
+                  <Image
+                    src={img.image.imageUrl}
+                    alt={`Similar image ${index + 1}`}
+                    fill
+                    style={{ objectFit: 'cover' }}
+                    className="transition-opacity duration-300 opacity-100"
+                    sizes="(max-width: 768px) 50vw, 150px"
+                  />
+                  <div className="absolute bottom-0 left-0 bg-black/70 text-white text-xs px-2 py-1">
+                    Similarity: {(img.similarity_score * 100).toFixed(2)}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // The main render method
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -803,6 +999,79 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
     }
   };
 
+  // We already have handleFindSimilar defined above, no need for a duplicate
+
+  // Add the missing handleBatchClassify function
+  const handleBatchClassify = async () => {
+    if (selectedAnomalies.length === 0) return;
+    
+    setFeedbackSubmitting(true);
+    
+    try {
+      if (demoMode) {
+        // In demo mode, just simulate the classification
+        setTimeout(() => {
+          // Update stats based on classification type
+          if (batchClassifyType === 'interesting') {
+            setStats(prev => ({
+              ...prev,
+              interesting: prev.interesting + selectedAnomalies.length
+            }));
+          } else {
+            setStats(prev => ({
+              ...prev,
+              notInteresting: prev.notInteresting + selectedAnomalies.length
+            }));
+          }
+          
+          setFeedbackSubmitting(false);
+          setShowBatchClassifyForm(false);
+          setSelectedAnomalies([]);
+          setBatchClassifyComment('');
+          
+          // Show success message
+          alert(`${selectedAnomalies.length} anomalies have been classified successfully in demo mode.`);
+        }, 1000);
+      } else {
+        // In real mode, call the API
+        const result = await submitBatchClassification({
+          image_ids: selectedAnomalies,
+          is_anomaly: batchClassifyType === 'interesting',
+          comment: batchClassifyComment
+        });
+        
+        // Update stats based on classification type
+        if (batchClassifyType === 'interesting') {
+          setStats(prev => ({
+            ...prev,
+            interesting: prev.interesting + (result.successful || 0)
+          }));
+        } else {
+          setStats(prev => ({
+            ...prev,
+            notInteresting: prev.notInteresting + (result.successful || 0)
+          }));
+        }
+        
+        setFeedbackSubmitting(false);
+        setShowBatchClassifyForm(false);
+        setSelectedAnomalies([]);
+        setBatchClassifyComment('');
+        
+        // Show success or partial success message
+        if (result.failed > 0) {
+          alert(`${result.successful} anomalies classified successfully, but ${result.failed} failed.`);
+        } else {
+          alert(`${result.successful} anomalies classified successfully!`);
+        }
+      }
+    } catch (err) {
+      console.error('Error in batch classification:', err);
+      setFeedbackSubmitting(false);
+      alert('Failed to classify anomalies. Please try again.');
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto p-4">
       <div className="text-center mb-8">
@@ -822,19 +1091,6 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           </div>
         )}
         
-        <p className="text-gray-600 dark:text-gray-300">
-          Use arrow keys: <span className="font-semibold">→</span> interesting, <span className="font-semibold">←</span> not interesting, <span className="font-semibold">↓</span> detailed feedback
-          <button 
-            onClick={() => setShowKeyboardShortcuts(true)} 
-            className="ml-2 inline-flex items-center text-blue-500 hover:text-blue-700"
-            aria-label="View keyboard shortcuts"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m-1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </button>
-        </p>
-        
         {/* Exit Demo Mode Button or Sync Button */}
         <div className="flex justify-center gap-2 mt-3">
           {demoMode ? (
@@ -843,7 +1099,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
               className="inline-flex items-center text-sm bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-1 px-3 rounded-full transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L13.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
               Exit Demo Mode
             </button>
@@ -854,7 +1110,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
               className="inline-flex items-center text-sm bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 py-1 px-3 rounded-full transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-1 ${syncStatus.syncing ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 011.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
               </svg>
               {syncStatus.syncing ? 'Syncing...' : 'Sync Data'}
             </button>
@@ -888,13 +1144,19 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
               src={currentAnomaly.imageUrl}
               alt={objectName}
               fill
-              priority={true}
+              priority={!isImageCached(currentAnomaly.imageUrl)} // Only use priority if not cached
               quality={75}
               style={{ objectFit: 'contain' }}
-              className="bg-black transition-opacity duration-300 opacity-100"
+              className={`bg-black transition-opacity duration-300 ${isImageCached(currentAnomaly.imageUrl) ? 'opacity-100' : 'opacity-0'}`}
               sizes="(max-width: 768px) 100vw, 700px"
               placeholder="blur"
               blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFdwI2QOQvuQAAAABJRU5ErkJggg=="
+              onLoad={() => {
+                // Ensure this URL is marked as preloaded
+                if (currentAnomaly.imageUrl && !preloadedImages.has(currentAnomaly.imageUrl)) {
+                  setPreloadedImages(prev => new Set(prev).add(currentAnomaly.imageUrl));
+                }
+              }}
             />
           ) : (
             <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
@@ -921,6 +1183,30 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
             {currentAnomaly.processing_time && (
               <p>Processing time: {currentAnomaly.processing_time.toFixed(2)}s</p>
             )}
+            
+            {/* Find Similar button */}
+            <button
+              onClick={handleFindSimilar}
+              disabled={fetchingSimilar}
+              className="mt-2 flex items-center space-x-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm transition-colors"
+            >
+              {fetchingSimilar ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Finding similar...</span>
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <span>Find similar anomalies</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Action buttons */}
@@ -1013,16 +1299,29 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
             <div>Avg. Time</div>
           </div>
         </div>
+        
+        {/* Batch Classification Button */}
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={() => setShowBatchClassifyForm(true)}
+            className="flex items-center space-x-1 bg-indigo-600 hover:bg-indigo-700 text-white py-1.5 px-3 rounded transition-colors shadow-sm text-sm"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            <span>Batch Classify Similar Images</span>
+          </button>
+        </div>
       </div>
 
-      {/* Detailed feedback form modal */}
-      {showDetailedForm && currentAnomaly && (
+      {/* Add the batch classification modal */}
+      {showBatchClassifyForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Detailed Feedback</h3>
+              <h3 className="text-xl font-bold">Batch Classification</h3>
               <button 
-                onClick={() => setShowDetailedForm(false)}
+                onClick={() => setShowBatchClassifyForm(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1031,13 +1330,199 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
               </button>
             </div>
             
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Object: {objectName}</p>
-              {coordinates && (
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Coordinates: RA {coordinates.ra.toFixed(5)}, Dec {coordinates.dec.toFixed(5)}
-                </p>
-              )}
+            <div className="mb-6">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Select multiple similar anomalies to classify them all at once.
+                This is useful for processing groups of similar objects efficiently.
+              </p>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Classification Type:</label>
+              <div className="flex space-x-4">
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    className="form-radio h-5 w-5 text-blue-600"
+                    value="interesting"
+                    checked={batchClassifyType === 'interesting'}
+                    onChange={() => setBatchClassifyType('interesting')}
+                  />
+                  <span className="ml-2 text-gray-700 dark:text-gray-300">Interesting</span>
+                </label>
+                
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    className="form-radio h-5 w-5 text-red-600"
+                    value="not_interesting"
+                    checked={batchClassifyType === 'not_interesting'}
+                    onChange={() => setBatchClassifyType('not_interesting')}
+                  />
+                  <span className="ml-2 text-gray-700 dark:text-gray-300">Not Interesting</span>
+                </label>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Select Similar Images:</label>
+              <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 border rounded">
+                {/* Render thumbnails of the anomalies for selection */}
+                {anomalies.map((anomaly, index) => (
+                  <div 
+                    key={anomaly.id} 
+                    className={`relative cursor-pointer rounded overflow-hidden border-2 ${
+                      selectedAnomalies.includes(anomaly.id) 
+                        ? 'border-blue-500 dark:border-blue-400' 
+                        : 'border-transparent'
+                    }`}
+                    onClick={() => {
+                      setSelectedAnomalies(prev => 
+                        prev.includes(anomaly.id) 
+                          ? prev.filter(id => id !== anomaly.id)
+                          : [...prev, anomaly.id]
+                      );
+                    }}
+                  >
+                    {/* Show a checkmark icon if selected */}
+                    {selectedAnomalies.includes(anomaly.id) && (
+                      <div className="absolute top-1 right-1 bg-blue-500 rounded-full p-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                    
+                    {/* Show thumbnail or placeholder */}
+                    {anomaly.imageUrl ? (
+                      <div className="h-16 w-full relative bg-black">
+                        <Image
+                          src={anomaly.imageUrl}
+                          alt={`Anomaly ${index + 1}`}
+                          fill
+                          style={{ objectFit: 'cover' }}
+                          className="opacity-80 hover:opacity-100 transition-opacity"
+                          sizes="(max-width: 768px) 33vw, 100px"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-16 w-full bg-gray-700 flex items-center justify-center text-xs text-gray-300">
+                        No Image
+                      </div>
+                    )}
+                    
+                    <div className="text-xs text-center p-1">
+                      {index + 1}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-1 text-sm">
+                {selectedAnomalies.length} anomalies selected
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">
+                Comment (optional):
+              </label>
+              <textarea
+                value={batchClassifyComment}
+                onChange={(e) => setBatchClassifyComment(e.target.value)}
+                rows={3}
+                className="w-full p-2 border rounded bg-white dark:bg-gray-700"
+                placeholder="Add a comment about these anomalies..."
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={handleBatchClassify}
+                disabled={feedbackSubmitting || selectedAnomalies.length === 0}
+                className={`flex-1 ${
+                  batchClassifyType === 'interesting' 
+                    ? 'bg-green-600 hover:bg-green-700' 
+                    : 'bg-red-600 hover:bg-red-700'
+                } text-white py-2 px-4 rounded transition-colors disabled:opacity-50`}
+              >
+                {feedbackSubmitting ? 'Processing...' : `Classify ${selectedAnomalies.length} Anomalies`}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowBatchClassifyForm(false)}
+                className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detailed feedback form modal with improved accessibility */}
+      {showDetailedForm && currentAnomaly && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto animate-fade-in"
+            tabIndex={-1} // Make div focusable
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setShowDetailedForm(false);
+              // Tab trap inside modal
+              if (e.key === 'Tab') {
+                const focusableElements = e.currentTarget.querySelectorAll(
+                  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                );
+                const firstElement = focusableElements[0] as HTMLElement;
+                const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+                
+                if (e.shiftKey && document.activeElement === firstElement) {
+                  e.preventDefault();
+                  lastElement.focus();
+                } else if (!e.shiftKey && document.activeElement === lastElement) {
+                  e.preventDefault();
+                  firstElement.focus();
+                }
+              }
+            }}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">Detailed Feedback</h3>
+              <button 
+                onClick={() => setShowDetailedForm(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"
+                aria-label="Close modal"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="mb-6 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+              <div className="flex items-start">
+                {currentAnomaly.imageUrl && (
+                  <div className="flex-shrink-0 w-20 h-20 relative mr-4 overflow-hidden rounded bg-black">
+                    <Image
+                      src={currentAnomaly.imageUrl}
+                      alt={objectName}
+                      fill
+                      style={{ objectFit: 'cover' }}
+                      className="opacity-90"
+                      sizes="80px"
+                    />
+                  </div>
+                )}
+                <div>
+                  <h4 className="font-medium text-lg">{objectName}</h4>
+                  {coordinates && (
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      RA {coordinates.ra.toFixed(5)}, Dec {coordinates.dec.toFixed(5)}
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Discovered: {discoveryDate}</p>
+                </div>
+              </div>
             </div>
             
             <form onSubmit={(e) => {
@@ -1099,120 +1584,172 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
                   moveToNext();
                 }, 300);
               }, 800);
-            }} className="space-y-4">
+            }} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300" htmlFor="classification">
                   Classification:
                 </label>
                 <select
+                  id="classification"
                   value={classification}
                   onChange={(e) => setClassification(e.target.value)}
-                  className="w-full p-2 border rounded bg-white dark:bg-gray-700"
+                  className="w-full p-3 border rounded-lg shadow-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-colors"
                   required
+                  aria-required="true"
+                  autoFocus
                 >
                   <option value="">Select a classification</option>
-                  <option value="Star">Star</option>
-                  <option value="Galaxy">Galaxy</option>
-                  <option value="Nebula">Nebula</option>
-                  <option value="Quasar">Quasar</option>
-                  <option value="Supernova">Supernova</option>
-                  <option value="Planet">Planet</option>
-                  <option value="Asteroid">Asteroid</option>
-                  <option value="Comet">Comet</option>
-                  <option value="Black Hole">Black Hole</option>
-                  <option value="Cosmic Ray">Cosmic Ray</option>
-                  <option value="Sensor Artifact">Sensor Artifact</option>
-                  <option value="Not Interesting">Not Interesting</option>
-                  <option value="Other">Other</option>
+                  <optgroup label="Astronomical Objects">
+                    <option value="Star">Star</option>
+                    <option value="Galaxy">Galaxy</option>
+                    <option value="Nebula">Nebula</option>
+                    <option value="Quasar">Quasar</option>
+                    <option value="Supernova">Supernova</option>
+                    <option value="Planet">Planet</option>
+                    <option value="Asteroid">Asteroid</option>
+                    <option value="Comet">Comet</option>
+                    <option value="Black Hole">Black Hole</option>
+                  </optgroup>
+                  <optgroup label="Other">
+                    <option value="Cosmic Ray">Cosmic Ray</option>
+                    <option value="Sensor Artifact">Sensor Artifact</option>
+                    <option value="Not Interesting">Not Interesting</option>
+                    <option value="Other">Other Classification</option>
+                  </optgroup>
                 </select>
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300" htmlFor="comments">
                   Comments:
                 </label>
                 <textarea
+                  id="comments"
                   value={comments}
                   onChange={(e) => setComments(e.target.value)}
                   rows={4}
-                  className="w-full p-2 border rounded bg-white dark:bg-gray-700"
-                  placeholder="Add any additional observations..."
+                  className="w-full p-3 border rounded-lg shadow-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-colors"
+                  placeholder="Add any additional observations or notes about this anomaly..."
                 />
               </div>
               
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="submit"
                   disabled={feedbackSubmitting || !classification}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition-colors disabled:bg-blue-400"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition-colors shadow-md disabled:bg-blue-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
-                  {feedbackSubmitting ? 'Submitting...' : 'Submit Feedback'}
+                  {feedbackSubmitting ? (
+                    <div className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Submitting...
+                    </div>
+                  ) : 'Submit Feedback'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowDetailedForm(false)}
-                  className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded transition-colors"
+                  className="sm:flex-none sm:w-auto w-full bg-gray-500 hover:bg-gray-600 text-white py-3 px-6 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
                 >
                   Cancel
                 </button>
               </div>
             </form>
+            
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Keyboard shortcuts</h4>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400">
+                <div>
+                  <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 rounded mr-1">Tab</span>
+                  Navigate inputs
+                </div>
+                <div>
+                  <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 rounded mr-1">Enter</span>
+                  Submit form
+                </div>
+                <div>
+                  <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-600 rounded mr-1">Esc</span>
+                  Close dialog
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
-      
-      {/* Keyboard shortcuts modal */}
-      {showKeyboardShortcuts && (
+
+      {/* Similar Images Modal - Improved UI and keyboard navigation */}
+      {showSimilarImages && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Keyboard Shortcuts</h3>
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto animate-fade-in"
+            tabIndex={-1} // Make div focusable
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setShowSimilarImages(false);
+              // Tab trap inside modal
+              if (e.key === 'Tab') {
+                const focusableElements = e.currentTarget.querySelectorAll(
+                  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                );
+                const firstElement = focusableElements[0] as HTMLElement;
+                const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+                
+                if (e.shiftKey && document.activeElement === firstElement) {
+                  e.preventDefault();
+                  lastElement.focus();
+                } else if (!e.shiftKey && document.activeElement === lastElement) {
+                  e.preventDefault();
+                  firstElement.focus();
+                }
+              }
+            }}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">Similar Images</h3>
               <button 
-                onClick={() => setShowKeyboardShortcuts(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                onClick={() => setShowSimilarImages(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"
+                aria-label="Close modal"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="border-2 border-gray-300 dark:border-gray-600 rounded w-12 h-10 flex items-center justify-center text-xl">
-                  ←
-                </div>
-                <div>Mark as "Not Interesting"</div>
+
+            {fetchingSimilar ? (
+              <div className="flex flex-col items-center justify-center p-10">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-300">Finding similar anomalies...</p>
               </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="border-2 border-gray-300 dark:border-gray-600 rounded w-12 h-10 flex items-center justify-center text-xl">
-                  →
-                </div>
-                <div>Mark as "Interesting"</div>
+            ) : similarImages.length === 0 ? (
+              <div className="text-center py-10">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <p className="text-gray-600 dark:text-gray-300">No similar images found.</p>
               </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="border-2 border-gray-300 dark:border-gray-600 rounded w-12 h-10 flex items-center justify-center text-xl">
-                  ↓
-                </div>
-                <div>Open detailed feedback form</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {similarImages.map((img, index) => (
+                  <div key={index} className="relative h-32 w-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden rounded">
+                    <Image
+                      src={img.image.imageUrl}
+                      alt={`Similar image ${index + 1}`}
+                      fill
+                      style={{ objectFit: 'cover' }}
+                      className="transition-opacity duration-300 opacity-100"
+                      sizes="(max-width: 768px) 50vw, 150px"
+                    />
+                    <div className="absolute bottom-0 left-0 bg-black/70 text-white text-xs px-2 py-1">
+                      Similarity: {(img.similarity_score * 100).toFixed(2)}%
+                    </div>
+                  </div>
+                ))}
               </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="border-2 border-gray-300 dark:border-gray-600 rounded w-12 h-10 flex items-center justify-center text-lg">
-                  ESC
-                </div>
-                <div>Exit demo mode (when active)</div>
-              </div>
-            </div>
-            
-            <button
-              onClick={() => setShowKeyboardShortcuts(false)}
-              className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition-colors"
-            >
-              Got it
-            </button>
+            )}
           </div>
         </div>
       )}

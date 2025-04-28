@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import TinderStyleAnomalyView from "@/components/TinderStyleAnomalyView";
-import AnomalyDashboard from "@/components/AnomalyDashboard";
 import StatisticsPanel from "@/components/StatisticsPanel";
 import ImageUploader from "@/components/ImageUploader";
 import SyncDataPanel from "@/components/SyncDataPanel";
@@ -114,7 +113,6 @@ export default function Home() {
 
             {/* Controls */}
             <div className="flex items-center space-x-2">
-              <ThemeToggle />
               
               <button 
                 onClick={() => setShowDemoControls(!showDemoControls)}
@@ -165,22 +163,7 @@ export default function Home() {
                   <span>Review</span>
                 </span>
               </button>
-              
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`pb-2 px-2 whitespace-nowrap transition-colors ${
-                  activeTab === 'dashboard'
-                    ? 'border-b-2 border-white font-medium'
-                    : 'text-blue-200 hover:text-white hover:border-blue-300 border-b-2 border-transparent'
-                }`}
-              >
-                <span className="flex items-center space-x-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <span>Dashboard</span>
-                </span>
-              </button>
+
               <button
                 onClick={() => setActiveTab('upload')}
                 className={`pb-2 px-2 whitespace-nowrap transition-colors ${
@@ -251,7 +234,34 @@ export default function Home() {
           
           {activeTab === 'dashboard' && (
             <div className="space-y-8">
-              <AnomalyDashboard />
+              <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 text-center">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="h-16 w-16 mx-auto text-blue-500 mb-4" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" 
+                  />
+                </svg>
+                <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Dashboard Temporarily Unavailable</h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  The Anomaly Dashboard is currently being redesigned for improved performance and usability.
+                </p>
+                <p className="text-gray-600 dark:text-gray-300">
+                  Please use the Review tab to interact with anomalies or check back later.
+                </p>
+              </div>
+              
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+                <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Statistics Summary</h2>
+                <StatisticsPanel userMode={true} />
+              </div>
             </div>
           )}
           
@@ -267,6 +277,22 @@ export default function Home() {
               <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
                 <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">System Overview</h2>
                 <StatisticsPanel userMode={false} />
+                
+                {/* Export Data button */}
+                <div className="mt-6">
+                  <button 
+                    onClick={() => {
+                      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+                      window.open(`${API_BASE_URL}/images/export?format=csv`, '_blank');
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors shadow-md flex items-center space-x-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>Export Data (CSV)</span>
+                  </button>
+                </div>
               </div>
 
               {/* Data Synchronization Panel */}
