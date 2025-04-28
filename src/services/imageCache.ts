@@ -203,18 +203,40 @@ export function useImageCache() {
    */
   const preloadImage = useCallback((url: string): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
+      // Skip undefined or null URLs
+      if (!url) {
+        reject(new Error('Invalid image URL: undefined or null'));
+        return;
+      }
+
+      // Normalize URL to ensure consistent cache keys
+      let normalizedUrl = url;
+      try {
+        // For URLs with http/https, ensure they're properly formatted
+        if (url.startsWith('http')) {
+          const urlObj = new URL(url);
+          normalizedUrl = urlObj.toString();
+        }
+      } catch (e) {
+        console.warn(`Failed to normalize URL: ${url}`, e);
+      }
+
       // Check if the image is already in the cache
-      if (globalImageCache.has(url)) {
+      if (globalImageCache.has(normalizedUrl)) {
         // Update the last accessed time for this entry
-        const entry = globalImageCache.get(url)!;
+        const entry = globalImageCache.get(normalizedUrl)!;
         entry.lastAccessed = Date.now();
-        globalImageCache.set(url, entry);
+        globalImageCache.set(normalizedUrl, entry);
         
+        // Increment hit count
         setStats(prev => ({ ...prev, hits: prev.hits + 1 }));
+        
+        // Resolve with cached image
         resolve(entry.data);
         return;
       }
       
+      // If not in cache, increment miss count
       setStats(prev => ({ ...prev, misses: prev.misses + 1 }));
       
       // If not in cache, load the image
@@ -241,47 +263,33 @@ export function useImageCache() {
         }
         
         // Add new image to cache with current timestamp
-        globalImageCache.set(url, {
+        globalImageCache.set(normalizedUrl, {
           data: img,
           lastAccessed: Date.now(),
-          url
+          url: normalizedUrl
         });
         
         // Mark that cache has changed and needs to be saved
         needsUpdate.current = true;
         
+        // Update stats in next tick to avoid triggering renders during render
+        setTimeout(() => {
+          setStats(prev => ({ ...prev, size: globalImageCache.size }));
+        }, 0);
+        
         resolve(img);
       };
       
-      img.onerror = () => {
-        reject(new Error(`Failed to load image: ${url}`));
+      img.onerror = (e) => {
+        console.error(`Failed to load image: ${normalizedUrl}`, e);
+        reject(new Error(`Failed to load image: ${normalizedUrl}`));
       };
       
       // Start loading the image
-      img.src = url;
+      img.crossOrigin = "anonymous"; // Enable CORS for images from other domains
+      img.src = normalizedUrl;
     });
   }, []);
-
-  /**
-   * Preload multiple images in sequence or parallel
-   * @param urls Array of image URLs to preload
-   * @param parallel Whether to load images in parallel (true) or sequence (false)
-   */
-  const preloadImages = useCallback(async (urls: string[], parallel = true) => {
-    if (parallel) {
-      // Load all images in parallel
-      await Promise.allSettled(urls.map(url => preloadImage(url)));
-    } else {
-      // Load images in sequence (reduces network contention)
-      for (const url of urls) {
-        try {
-          await preloadImage(url);
-        } catch (error) {
-          console.error(`Failed to preload image: ${url}`, error);
-        }
-      }
-    }
-  }, [preloadImage]);
 
   /**
    * Check if an image is already in the cache
@@ -289,7 +297,29 @@ export function useImageCache() {
    * @returns True if image is cached, false otherwise
    */
   const isImageCached = useCallback((url: string): boolean => {
-    return globalImageCache.has(url);
+    if (!url) return false;
+    
+    // Normalize URL to match how it's stored
+    let normalizedUrl = url;
+    try {
+      if (url.startsWith('http')) {
+        const urlObj = new URL(url);
+        normalizedUrl = urlObj.toString();
+      }
+    } catch (e) {
+      console.warn(`Failed to normalize URL in isImageCached: ${url}`, e);
+    }
+    
+    const isCached = globalImageCache.has(normalizedUrl);
+    
+    // If it's cached, update last accessed time but don't trigger state update
+    if (isCached) {
+      const entry = globalImageCache.get(normalizedUrl)!;
+      entry.lastAccessed = Date.now();
+      globalImageCache.set(normalizedUrl, entry);
+    }
+    
+    return isCached;
   }, []);
 
   /**
@@ -316,6 +346,39 @@ export function useImageCache() {
     });
     needsUpdate.current = true;
   }, []);
+
+  /**
+   * Preload multiple images in sequence or parallel
+   * @param urls Array of image URLs to preload
+   * @param parallel Whether to load images in parallel (true) or sequence (false)
+   */
+  const preloadImages = useCallback(async (urls: string[], parallel = true) => {
+    if (!urls || !Array.isArray(urls)) {
+      console.warn('Invalid URLs provided to preloadImages:', urls);
+      return;
+    }
+    
+    // Filter out empty or invalid URLs
+    const validUrls = urls.filter(url => url && typeof url === 'string');
+    
+    if (validUrls.length === 0) {
+      return; // Nothing to preload
+    }
+
+    if (parallel) {
+      // Load all images in parallel
+      await Promise.allSettled(validUrls.map(url => preloadImage(url)));
+    } else {
+      // Load images in sequence (reduces network contention)
+      for (const url of validUrls) {
+        try {
+          await preloadImage(url);
+        } catch (error) {
+          console.error(`Failed to preload image: ${url}`, error);
+        }
+      }
+    }
+  }, [preloadImage]);
 
   return {
     preloadImage,

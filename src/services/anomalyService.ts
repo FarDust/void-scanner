@@ -32,14 +32,21 @@ export interface AnomalyObject {
 // API endpoint paths from OpenAPI spec
 const API_ENDPOINTS = {
   HEALTH: '/health',
-  PROCESS: '/process',
-  PROCESS_DIRECTORY: '/process/',
-  GET_IMAGES: '/images/',
+  PROCESS: '/images', // POST images endpoint for image upload
+  GET_IMAGES: '/images/', 
   GET_IMAGE_DETAILS: (id: string) => `/images/${id}`,
   GET_IMAGE_FILE: (id: string) => `/images/${id}/file`,
   CLASSIFY_IMAGE: (id: string) => `/images/${id}/classify`,
   STATISTICS: '/statistics',
-  SYNC_ANOMALY_DATA: '/sync-anomaly-data'
+  DASHBOARD_STATISTICS: '/statistics/dashboard',
+  SYNC_ANOMALY_DATA: '/sync-anomaly-data',
+  SEARCH_IMAGES: '/images/search', 
+  BATCH_CLASSIFY: '/images/classifications', // Updated to match OpenAPI spec - PATCH endpoint
+  CLASSIFICATION_HISTORY: (id: string) => `/images/${id}/classifications`,
+  EXPORT_IMAGES: '/images/export',
+  SIMILAR_IMAGES: (id: string) => `/images/${id}/similarities`,
+  VISUALIZATION: (id: string) => `/images/${id}/visualization`,
+  PCA_VISUALIZATION: '/visualizations/pca'
 };
 
 // Base API URL - can be configured in .env.local with NEXT_PUBLIC_API_URL
@@ -213,36 +220,45 @@ export const getAnomalies = async (
   try {
     // Add pagination parameters to the query
     const queryParams = new URLSearchParams({
-      anomalies_only: anomaliesOnly.toString(),
       page: page.toString(),
-      limit: pageSize.toString()
+      page_size: pageSize.toString() // Updated to match new API parameter name
     });
     
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GET_IMAGES}?${queryParams}`);
+    // Add anomalies filter if specified
+    if (anomaliesOnly) {
+      queryParams.append('is_anomaly', 'true');
+    }
+    
+    // Use the new search endpoint which supports more advanced filtering
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.SEARCH_IMAGES}?${queryParams}`);
     
     if (!response.ok) {
       throw new Error(`Error fetching anomalies: ${response.statusText}`);
     }
     
-    // Get total count from headers if available
-    const totalCount = parseInt(response.headers.get('X-Total-Count') || '0', 10);
+    const responseData = await response.json();
     
-    const data = await response.json();
+    // The new API returns a structured response with results, total_count, etc.
+    if (!responseData || typeof responseData !== 'object') {
+      throw new Error('Invalid response from API');
+    }
     
-    // Enhance each anomaly with additional data
-    const enhancedData = data.map((item: any) => enhanceAnomalyData({
+    // Extract the results array
+    const results = responseData.results || [];
+    const totalCount = responseData.total_count || 0;
+    const totalPages = responseData.total_pages || 1;
+    const currentPage = responseData.page || page;
+    
+    // Enhance each anomaly with additional data for UI display
+    const enhancedData = results.map((item: any) => enhanceAnomalyData({
       ...item,
       imageUrl: `${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_FILE(item.id)}`
     }));
     
-    // If API doesn't provide total count, use the data length (for demo purposes)
-    const actualTotalCount = totalCount || enhancedData.length;
-    const totalPages = Math.ceil(actualTotalCount / pageSize);
-    
     return {
       data: enhancedData,
-      totalCount: actualTotalCount,
-      currentPage: page,
+      totalCount: totalCount,
+      currentPage: currentPage,
       totalPages: totalPages
     };
   } catch (err) {
@@ -256,14 +272,30 @@ export const getAnomalies = async (
  */
 export const getNormalImages = async (limit: number = 5): Promise<AnomalyObject[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GET_IMAGES}?anomalies_only=false`);
+    // Use the search endpoint with is_anomaly=false
+    const queryParams = new URLSearchParams({
+      is_anomaly: 'false',
+      page: '1',
+      page_size: (limit * 2).toString() // Request more than we need to have a good selection
+    });
+    
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.SEARCH_IMAGES}?${queryParams}`);
     
     if (!response.ok) {
       throw new Error(`Error fetching normal images: ${response.statusText}`);
     }
     
-    const data = await response.json();
-    const normalImages = data.filter((item: any) => !item.is_anomaly);
+    const responseData = await response.json();
+    
+    // The new API returns a structured response with results
+    let normalImages: any[] = [];
+    
+    if (responseData && responseData.results && Array.isArray(responseData.results)) {
+      normalImages = responseData.results;
+    } else {
+      console.warn('Unexpected API response format in getNormalImages:', responseData);
+      return []; // Return empty array if we can't process the response
+    }
     
     // Select a random subset if we have more than the limit
     let selected = normalImages;
@@ -358,7 +390,7 @@ export const submitAnomalyFeedback = async (id: string, feedback: {
 /**
  * Get statistics about processed images
  */
-export const getStatistics = async (): Promise<{
+export const getStatistics = async (useDashboard = false): Promise<{
   total_images: number;
   anomaly_count: number;
   normal_count: number;
@@ -368,9 +400,16 @@ export const getStatistics = async (): Promise<{
   anomalies_detected?: number;
   classified_images?: number;
   average_anomaly_score?: number;
+  user_confirmed_anomalies?: number;
+  unclassified_anomalies?: number;
+  false_positives?: number;
+  false_negatives?: number;
+  recent_activity?: any[];
 }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.STATISTICS}`);
+    // Use the dashboard statistics endpoint if requested (more comprehensive stats)
+    const endpoint = useDashboard ? API_ENDPOINTS.DASHBOARD_STATISTICS : API_ENDPOINTS.STATISTICS;
+    const response = await fetch(`${API_BASE_URL}${endpoint}`);
     
     if (!response.ok) {
       throw new Error(`Error fetching statistics: ${response.statusText}`);
@@ -378,11 +417,11 @@ export const getStatistics = async (): Promise<{
     
     const data = await response.json();
 
-    // Return both the original API fields and our frontend-specific field names 
+    // Return both the original API fields and our frontend-specific field names
     return {
       total_images: data.total_images,
-      anomaly_count: data.anomalies_detected || 0,
-      normal_count: data.total_images - (data.anomalies_detected || 0),
+      anomaly_count: data.anomalies_detected || data.total_anomalies || 0,
+      normal_count: data.total_images - (data.anomalies_detected || data.total_anomalies || 0),
       processing_time_avg: data.average_processing_time || data.average_anomaly_score || 0,
       // Include the original API fields too
       ...data
@@ -420,5 +459,275 @@ export const processImage = async (imageFile: File): Promise<{
     return await response.json();
   } catch (err) {
     return handleApiError(err);
+  }
+};
+
+/**
+ * Submit batch classification for multiple images at once
+ */
+export const batchClassifyImages = async (
+  imageIds: string[],
+  isAnomaly: boolean,
+  comment?: string
+): Promise<{
+  total: number;
+  successful: number;
+  failed: number;
+  failedIds: string[];
+}> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.BATCH_CLASSIFY}`, {
+      method: 'PATCH', // Note: using PATCH as specified in the API
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image_ids: imageIds,
+        is_anomaly: isAnomaly,
+        comment: comment || ''
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error submitting batch classification: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return {
+      total: data.total || imageIds.length,
+      successful: data.successful || 0,
+      failed: data.failed || imageIds.length,
+      failedIds: data.failed_ids || []
+    };
+  } catch (err) {
+    console.error('Error in batch classification:', err);
+    return {
+      total: imageIds.length,
+      successful: 0,
+      failed: imageIds.length,
+      failedIds: imageIds
+    };
+  }
+};
+
+/**
+ * Get classification history for an image
+ */
+export const getClassificationHistory = async (imageId: string): Promise<{
+  image_id: string;
+  classifications: Array<{
+    id: string;
+    image_id: string;
+    user_classification: boolean;
+    comment: string | null;
+    timestamp: string;
+  }>;
+}> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CLASSIFICATION_HISTORY(imageId)}`);
+    
+    if (!response.ok) {
+      throw new Error(`Error fetching classification history: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (err) {
+    console.error('Error fetching classification history:', err);
+    return {
+      image_id: imageId,
+      classifications: []
+    };
+  }
+};
+
+/**
+ * Get similar images for a specific image
+ */
+export const getSimilarImages = async (
+  imageId: string, 
+  limit: number = 10, 
+  minScore: number = 0.5
+): Promise<{
+  reference_image_id: string;
+  similar_images: Array<{
+    image: AnomalyObject;
+    similarity_score: number;
+  }>;
+}> => {
+  try {
+    const queryParams = new URLSearchParams({
+      limit: limit.toString(),
+      min_score: minScore.toString()
+    });
+    
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.SIMILAR_IMAGES(imageId)}?${queryParams}`);
+    
+    if (!response.ok) {
+      throw new Error(`Error fetching similar images: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Enhance the returned data for UI display
+    const enhancedData = {
+      reference_image_id: data.reference_image_id,
+      similar_images: data.similar_images.map((item: any) => ({
+        ...item,
+        image: enhanceAnomalyData({
+          ...item.image,
+          imageUrl: `${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_FILE(item.image.id)}`
+        })
+      }))
+    };
+    
+    return enhancedData;
+  } catch (err) {
+    console.error('Error fetching similar images:', err);
+    return {
+      reference_image_id: imageId,
+      similar_images: []
+    };
+  }
+};
+
+/**
+ * Get visualizations for a specific image
+ */
+export const getImageVisualizations = async (imageId: string): Promise<{
+  image_id: string;
+  visualizations: Array<{
+    image_id: string;
+    visualization_type: 'original' | 'processed' | 'anomaly_heatmap' | 'bounding_box';
+    image_data: string;
+  }>;
+  reconstruction_error: number;
+  is_anomaly: boolean;
+  anomaly_score: number;
+}> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.VISUALIZATION(imageId)}`);
+    
+    if (!response.ok) {
+      throw new Error(`Error fetching image visualizations: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (err) {
+    console.error('Error fetching visualizations:', err);
+    return {
+      image_id: imageId,
+      visualizations: [],
+      reconstruction_error: 0,
+      is_anomaly: false,
+      anomaly_score: 0
+    };
+  }
+};
+
+/**
+ * Create a PCA visualization of images
+ */
+export const createPcaVisualization = async (options?: {
+  filter?: {
+    is_anomaly?: boolean;
+    date_range?: {
+      start_date?: string;
+      end_date?: string;
+    };
+    anomaly_score?: {
+      min_score?: number;
+      max_score?: number;
+    };
+    classification?: {
+      is_classified?: boolean;
+      user_classification?: boolean;
+    };
+  };
+  highlight_anomalies?: boolean;
+  use_interactive?: boolean;
+  include_image_paths?: boolean;
+}): Promise<{
+  visualization: string;
+  projection_data?: any;
+  anomaly_threshold: number;
+  total_points: number;
+  anomaly_count: number;
+  is_interactive?: boolean;
+}> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PCA_VISUALIZATION}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(options || {}),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error creating PCA visualization: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (err) {
+    console.error('Error creating PCA visualization:', err);
+    return {
+      visualization: '',
+      anomaly_threshold: 0,
+      total_points: 0,
+      anomaly_count: 0
+    };
+  }
+};
+
+/**
+ * Export images data with optional filtering
+ */
+export const exportImages = async (
+  format: 'json' | 'csv' = 'json',
+  filters?: {
+    is_anomaly?: boolean;
+    start_date?: string;
+    end_date?: string;
+    min_score?: number;
+    max_score?: number;
+    is_classified?: boolean;
+    user_classification?: boolean;
+  },
+  include_classifications: boolean = true,
+  sort_by?: string,
+  sort_order: string = 'desc'
+): Promise<Blob> => {
+  try {
+    // Build query parameters
+    const queryParams = new URLSearchParams({
+      format,
+      include_classifications: include_classifications.toString(),
+      sort_order
+    });
+    
+    // Add optional parameters
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    
+    if (sort_by) {
+      queryParams.append('sort_by', sort_by);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.EXPORT_IMAGES}?${queryParams}`);
+    
+    if (!response.ok) {
+      throw new Error(`Error exporting images: ${response.statusText}`);
+    }
+    
+    return await response.blob();
+  } catch (err) {
+    console.error('Error exporting images:', err);
+    throw err;
   }
 };

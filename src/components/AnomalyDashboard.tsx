@@ -204,9 +204,11 @@ export default function AnomalyDashboard() {
       // Update last fetch time
       setLastFetchTime(now);
       
-      // Use the paginated API
-      const response = await getAnomalies(pageNum, 9, debouncedAnomaliesOnly);
+      // Use the paginated API with the correct parameters
+      const pageSize = 9; // Keep this consistent with the OpenAPI spec
+      const response = await getAnomalies(pageNum, pageSize, debouncedAnomaliesOnly);
       
+      // The getAnomalies function now returns a different structure that matches the OpenAPI spec
       const newAnomalies = response.data;
       setTotalCount(response.totalCount);
       setTotalPages(response.totalPages);
@@ -256,7 +258,6 @@ export default function AnomalyDashboard() {
       apiStatus.available = true;
       apiStatus.consecutiveFailures = 0;
       apiStatus.backoffTime = 2000; // Reset backoff time
-      
     } catch (err) {
       console.error('Error fetching anomalies:', err);
       
@@ -267,10 +268,7 @@ export default function AnomalyDashboard() {
       // Implement exponential backoff with jitter
       // Double the backoff time with each consecutive failure, add small random jitter, cap at maximum
       const jitter = Math.random() * 1000; // Random value between 0-1000ms
-      apiStatus.backoffTime = Math.min(
-        apiStatus.backoffTime * 2 + jitter, 
-        apiStatus.maxBackoff
-      );
+      apiStatus.backoffTime = Math.min(apiStatus.backoffTime * 2 + jitter, apiStatus.maxBackoff);
       
       console.log(`API unavailable. Consecutive failures: ${apiStatus.consecutiveFailures}. Next attempt in ${Math.ceil(apiStatus.backoffTime/1000)}s`);
       
