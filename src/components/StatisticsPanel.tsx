@@ -17,7 +17,6 @@ interface StatisticData {
   false_negatives?: number;
   storage_type: string;
   storage_location: string;
-  processing_time_avg: number;
   recent_activity?: any[];
   user_agreement?: number;
 }
@@ -42,16 +41,16 @@ export default function StatisticsPanel({ userMode = false }: { userMode?: boole
           normal_count: data.normal_count || 0,
           storage_type: data.storage_type || 'Unknown',
           storage_location: data.storage_location || 'Unknown',
-          processing_time_avg: data.processing_time_avg || 0,
           user_confirmed_anomalies: data.user_confirmed_anomalies || 0,
           unclassified_anomalies: data.unclassified_anomalies || 0,
           false_positives: data.false_positives || 0,
           false_negatives: data.false_negatives || 0,
           recent_activity: data.recent_activity || [],
-          // Calculate user agreement from API data if available, or default to null
-          user_agreement: data.user_confirmed_anomalies && data.total_images 
-            ? (data.user_confirmed_anomalies / (data.total_images * 0.01)) 
-            : null
+          // Use user_agreement directly from the API if available
+          user_agreement: data.user_agreement || 
+            (data.user_confirmed_anomalies && data.total_images 
+              ? (data.user_confirmed_anomalies / (data.total_images * 0.01)) 
+              : 3) // Default to 3% if no data is available
         });
       } catch (err) {
         console.error('Error fetching statistics:', err);

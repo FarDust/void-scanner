@@ -213,7 +213,7 @@ export default function Home() {
               </svg>
               <span className="font-semibold">Void Scanner</span>
             </div>
-            <span>© 2025</span>
+            <span>FarDust © 2025</span>
           </div>
         </div>
       </footer>

@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'cdn.esahubble.org',
+      },
+      {
+        protocol: 'https',
         hostname: 'esahubble.org',
       },
       {
