@@ -21,11 +21,34 @@ interface StatisticData {
   user_agreement?: number;
 }
 
+// Demo statistics for when the API is down
+const demoStatistics: StatisticData = {
+  total_images: 2500,
+  anomalies_detected: 150,
+  anomaly_count: 150,
+  classified_images: 120,
+  average_anomaly_score: 12.45,
+  normal_count: 2350,
+  user_confirmed_anomalies: 75,
+  unclassified_anomalies: 30,
+  false_positives: 15,
+  false_negatives: 5,
+  storage_type: 'Demo',
+  storage_location: 'browser',
+  recent_activity: [
+    { event: 'image_processed', timestamp: '2025-05-05T14:55:00Z', image_id: 'demo-1' },
+    { event: 'anomaly_detected', timestamp: '2025-05-05T14:52:00Z', image_id: 'demo-2' },
+    { event: 'user_classification', timestamp: '2025-05-05T14:45:00Z', image_id: 'demo-3' }
+  ],
+  user_agreement: 85
+};
+
 export default function StatisticsPanel({ userMode = false }: { userMode?: boolean }) {
   const [stats, setStats] = useState<StatisticData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'system'>('system');
+  const [demoMode, setDemoMode] = useState(false);
 
   useEffect(() => {
     const fetchStatistics = async () => {
@@ -52,9 +75,12 @@ export default function StatisticsPanel({ userMode = false }: { userMode?: boole
               ? (data.user_confirmed_anomalies / (data.total_images * 0.01)) 
               : 3) // Default to 3% if no data is available
         });
+        setDemoMode(false);
       } catch (err) {
         console.error('Error fetching statistics:', err);
-        setError('Failed to load statistics. Please try again later.');
+        // Instead of showing error, switch to demo mode with sample data
+        setStats(demoStatistics);
+        setDemoMode(true);
       } finally {
         setLoading(false);
       }
@@ -76,16 +102,20 @@ export default function StatisticsPanel({ userMode = false }: { userMode?: boole
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
-        <p>{error}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+      {/* Demo mode indicator */}
+      {demoMode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md dark:bg-blue-900/20 dark:border-blue-800">
+          <p className="text-sm text-blue-800 dark:text-blue-300 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Showing demo statistics. API connection unavailable.
+          </p>
+        </div>
+      )}
+      
       {/* Tabs for switching between different stat views */}
       {userMode ? (
         <div className="flex border-b border-gray-200 dark:border-gray-700 mb-5">
