@@ -7,15 +7,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { limit = '5' } = req.query;
+    const { 
+      limit = '5',
+      start_date,
+      end_date,
+      min_score,
+      max_score,
+      is_classified,
+      user_classification,
+      sort_by = 'processed_at',
+      sort_order = 'desc'
+    } = req.query;
+    
     const actualLimit = parseInt(limit.toString(), 10);
     
     // Request more than needed to have a good selection for randomization
     const queryParams = new URLSearchParams({
       is_anomaly: 'false',
       page: '1',
-      page_size: (actualLimit * 2).toString()
+      page_size: (actualLimit * 2).toString(),
+      sort_by: sort_by.toString(),
+      sort_order: sort_order.toString()
     });
+
+    // Add optional parameters if specified
+    if (start_date) queryParams.append('start_date', start_date.toString());
+    if (end_date) queryParams.append('end_date', end_date.toString());
+    if (min_score) queryParams.append('min_score', min_score.toString());
+    if (max_score) queryParams.append('max_score', max_score.toString());
+    if (is_classified !== undefined) queryParams.append('is_classified', is_classified.toString());
+    if (user_classification !== undefined) queryParams.append('user_classification', user_classification.toString());
 
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/search?${queryParams}`, {
       method: 'GET',

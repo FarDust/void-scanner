@@ -6,10 +6,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { useDashboard } = req.query;
-
-    // Determine which endpoint to use based on the query parameter
-    const endpoint = useDashboard === 'true' ? '/statistics/dashboard' : '/statistics';
+    const { dashboard } = req.query;
+    
+    // Determine which endpoint to use based on whether the dashboard parameter is present
+    // This aligns with the OpenAPI spec which defines two separate endpoints
+    const endpoint = dashboard === 'true' ? '/statistics/dashboard' : '/statistics';
 
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
       method: 'GET',

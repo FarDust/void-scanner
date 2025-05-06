@@ -984,16 +984,6 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
   const discoveryDate = currentAnomaly.metadata?.discoveryDate || 'Unknown';
   const instrument = currentAnomaly.metadata?.instrument || 'Unknown';
 
-  // Validate image URL before rendering
-  const isValidImageUrl = (url) => {
-    try {
-      const parsedUrl = new URL(url);
-      return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
   // We already have handleFindSimilar defined above, no need for a duplicate
 
   // Add the missing handleBatchClassify function
@@ -1078,7 +1068,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           ${animateDirection === 'left' ? '-translate-x-full opacity-0' : animateDirection === 'right' ? 'translate-x-full opacity-0' : ''}`}
       >
         <div className="relative h-56 sm:h-64 md:h-72 w-full">
-          {currentAnomaly.imageUrl && isValidImageUrl(currentAnomaly.imageUrl) ? (
+          {currentAnomaly.imageUrl ? (
             <Image
               src={currentAnomaly.imageUrl}
               alt={objectName}
