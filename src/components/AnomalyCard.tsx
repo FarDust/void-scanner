@@ -39,7 +39,7 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
       
       // Si llegamos aquí y anomaly.imageUrl es un objeto, convertir a string para evitar errores de renderizado
       if (typeof anomaly.imageUrl === 'object') {
-        return 'test-image-url';
+        return PLACEHOLDER_IMAGE_URL;
       }
       
       return String(anomaly.imageUrl);
