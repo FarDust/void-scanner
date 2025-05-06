@@ -4,11 +4,25 @@ import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { processImage } from '../services/anomalyService';
 
+// Demo mode constants
+const DEMO_MODE_ENABLED = true; // Flag to enable/disable demo mode functionality
+const DEMO_RESULT = {
+  id: "demo-12345-abcdef",
+  filename: "demo_image.jpg",
+  timestamp: new Date().toISOString(),
+  reconstruction_error: 0.0856,
+  is_anomaly: true,
+  anomaly_score: 85.34,
+  path: "/demo/images/sample.jpg",
+  processing_time: 1.42
+};
+
 export default function ImageUploader() {
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   // Update interface to match OpenAPI schema
   const [result, setResult] = useState<{
     id: string;
@@ -69,9 +83,43 @@ export default function ImageUploader() {
       setUploading(true);
       setError(null);
       setResult(null);
+      setIsDemoMode(false);
       
-      const result = await processImage(file);
-      setResult(result);
+      try {
+        const result = await processImage(file);
+        setResult(result);
+      } catch (err: any) {
+        console.error("Error processing image:", err);
+        // Check if it's a server error (likely API is down)
+        if (err.message && (
+            err.message.includes("Internal Server Error") || 
+            err.message.includes("Network Error") ||
+            err.message.includes("Failed to fetch")
+          )) {
+          // Activate demo mode
+          if (DEMO_MODE_ENABLED) {
+            console.log("API appears to be down. Activating demo mode...");
+            setIsDemoMode(true);
+            
+            // Wait a bit to simulate processing
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // Use demo data with the actual filename
+            setResult({
+              ...DEMO_RESULT,
+              filename: file.name,
+              timestamp: new Date().toISOString()
+            });
+            
+            // Show a non-blocking notification that we're in demo mode
+            setError("⚠️ API unavailable - Demo mode activated (showing simulated results)");
+            return;
+          }
+        }
+        
+        // If demo mode is disabled or it's not a server error, show the error
+        setError(err.message || 'An error occurred while processing the image');
+      }
     } catch (err: any) {
       setError(err.message || 'An error occurred while processing the image');
     } finally {
@@ -102,10 +150,12 @@ export default function ImageUploader() {
         <input
           ref={inputRef}
           type="file"
+          name="file"
           className="hidden"
           accept="image/*"
           onChange={handleChange}
           disabled={uploading}
+          data-testid="file-input"
         />
         
         {uploading ? (
@@ -134,13 +184,24 @@ export default function ImageUploader() {
       </div>
       
       {error && (
-        <div className="mt-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+        <div className={`mt-4 border-l-4 p-4 ${
+          isDemoMode 
+            ? "bg-yellow-50 border-yellow-500 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-500 dark:text-yellow-300" 
+            : "bg-red-100 border-red-500 text-red-700 dark:bg-red-900/20 dark:border-red-500 dark:text-red-300"
+        }`}>
           <p>{error}</p>
         </div>
       )}
       
       {result && (
-        <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+        <div className={`mt-6 p-4 ${isDemoMode ? "bg-yellow-50/50 dark:bg-yellow-900/10" : "bg-gray-50 dark:bg-gray-700"} rounded-lg`}>
+          {isDemoMode && (
+            <div className="mb-4 px-4 py-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-md text-yellow-800 dark:text-yellow-200 text-sm">
+              <p className="font-semibold">Demo Mode Active</p>
+              <p>The API is currently unavailable. Showing simulated results.</p>
+            </div>
+          )}
+          
           <h3 className="text-xl font-semibold mb-4">Analysis Results</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -164,16 +225,22 @@ export default function ImageUploader() {
             {/* Analysis results column */}
             <div className="flex flex-col">
               <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Image ID</p>
-                  <p className="font-mono text-sm truncate">{result.id}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Classification</p>
-                  <div className={`font-medium text-lg ${result.is_anomaly ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
-                    {result.is_anomaly ? 'Potential Anomaly' : 'Normal'}
-                  </div>
-                </div>
+                {
+                  result.id !== "" && (
+                    <>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Image ID</p>
+                      <p className="font-mono text-sm truncate">{result.id}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Classification</p>
+                      <div className={`font-medium text-lg ${result.is_anomaly ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
+                        {result.is_anomaly ? 'Potential Anomaly' : 'Normal'}
+                      </div>
+                    </div>
+                    </>
+                  )
+                }
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Anomaly Score</p>
                   <div className="relative pt-1">
@@ -221,16 +288,14 @@ export default function ImageUploader() {
                   <p className="text-sm text-gray-500 dark:text-gray-400">Processed</p>
                   <p>{new Date(result.timestamp).toLocaleString()}</p>
                 </div>
+                {isDemoMode && result.processing_time && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Processing Time</p>
+                    <p>{result.processing_time.toFixed(2)}s <span className="text-xs text-yellow-600 dark:text-yellow-400">(simulated)</span></p>
+                  </div>
+                )}
               </div>
                 
-              <div className="mt-4 text-right">
-                <a 
-                  href={`/anomalies/${result.id}`}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  View Details
-                </a>
-              </div>
             </div>
           </div>
         </div>

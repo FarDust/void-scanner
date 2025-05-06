@@ -49,9 +49,6 @@ const API_ENDPOINTS = {
   PCA_VISUALIZATION: '/visualizations/pca'
 };
 
-// Base API URL - can be configured in .env.local with NEXT_PUBLIC_API_URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
 /**
  * Helper function to handle API errors
  */
@@ -133,7 +130,7 @@ const enhanceAnomalyData = (anomaly: AnomalyObject): AnomalyObject => {
   const dec = fileInfo.coordinates.y / 100; // Simplified conversion for display
   
   // Add image URL if not already present
-  const imageUrl = anomaly.imageUrl || `${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_FILE(anomaly.id)}`;
+  const imageUrl = anomaly.imageUrl || `/api${API_ENDPOINTS.GET_IMAGE_FILE(anomaly.id)}`;
   
   // Enhance metadata
   const metadata = anomaly.metadata || {};
@@ -171,20 +168,19 @@ export const syncAnomalyData = async (): Promise<{
   total_records?: number;
 }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.SYNC_ANOMALY_DATA}`, {
+    // Use the new Next.js API route
+    const response = await fetch('/api/syncAnomalyData', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-      }
+      },
     });
-    
+
     if (!response.ok) {
       throw new Error(`Error syncing data: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
-    
-    // Add a success flag for frontend use
     return {
       success: true,
       message: data.message,
@@ -193,15 +189,50 @@ export const syncAnomalyData = async (): Promise<{
       skipped_count: data.skipped_count,
       error_count: data.error_count,
       total_records: data.total_records,
-      source: data.source
+      source: data.source,
     };
   } catch (err) {
     return {
       success: false,
       message: err?.message || 'An error occurred while syncing data',
-      imported_count: 0
+      imported_count: 0,
     };
   }
+
+  // Old implementation (commented out for reference)
+  /*
+  try {
+    const response = await fetch(`/api${API_ENDPOINTS.SYNC_ANOMALY_DATA}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error syncing data: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    return {
+      success: true,
+      message: data.message,
+      imported_count: data.imported_count,
+      anomaly_count: data.anomaly_count,
+      skipped_count: data.skipped_count,
+      error_count: data.error_count,
+      total_records: data.total_records,
+      source: data.source,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: err?.message || 'An error occurred while syncing data',
+      imported_count: 0,
+    };
+  }
+  */
 };
 
 /**
@@ -221,7 +252,7 @@ export const getAnomalies = async (
     // Add pagination parameters to the query
     const queryParams = new URLSearchParams({
       page: page.toString(),
-      page_size: pageSize.toString() // Updated to match new API parameter name
+      page_size: pageSize.toString()
     });
     
     // Add anomalies filter if specified
@@ -229,8 +260,8 @@ export const getAnomalies = async (
       queryParams.append('is_anomaly', 'true');
     }
     
-    // Use the new search endpoint which supports more advanced filtering
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.SEARCH_IMAGES}?${queryParams}`);
+    // Use the Next.js API route instead of calling the backend directly
+    const response = await fetch(`/api/anomalies?${queryParams}`);
     
     if (!response.ok) {
       throw new Error(`Error fetching anomalies: ${response.statusText}`);
@@ -238,7 +269,7 @@ export const getAnomalies = async (
     
     const responseData = await response.json();
     
-    // The new API returns a structured response with results, total_count, etc.
+    // The API returns a structured response with results, total_count, etc.
     if (!responseData || typeof responseData !== 'object') {
       throw new Error('Invalid response from API');
     }
@@ -252,7 +283,7 @@ export const getAnomalies = async (
     // Enhance each anomaly with additional data for UI display
     const enhancedData = results.map((item: any) => enhanceAnomalyData({
       ...item,
-      imageUrl: `${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_FILE(item.id)}`
+      imageUrl: `/api${API_ENDPOINTS.GET_IMAGE_FILE(item.id)}`
     }));
     
     return {
@@ -272,14 +303,12 @@ export const getAnomalies = async (
  */
 export const getNormalImages = async (limit: number = 5): Promise<AnomalyObject[]> => {
   try {
-    // Use the search endpoint with is_anomaly=false
+    // Use the Next.js API route with limit parameter
     const queryParams = new URLSearchParams({
-      is_anomaly: 'false',
-      page: '1',
-      page_size: (limit * 2).toString() // Request more than we need to have a good selection
+      limit: (limit * 2).toString() // Request more than we need to have a good selection
     });
     
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.SEARCH_IMAGES}?${queryParams}`);
+    const response = await fetch(`/api/normal-images?${queryParams}`);
     
     if (!response.ok) {
       throw new Error(`Error fetching normal images: ${response.statusText}`);
@@ -287,11 +316,13 @@ export const getNormalImages = async (limit: number = 5): Promise<AnomalyObject[
     
     const responseData = await response.json();
     
-    // The new API returns a structured response with results
+    // Process the response
     let normalImages: any[] = [];
     
     if (responseData && responseData.results && Array.isArray(responseData.results)) {
       normalImages = responseData.results;
+    } else if (Array.isArray(responseData)) {
+      normalImages = responseData;
     } else {
       console.warn('Unexpected API response format in getNormalImages:', responseData);
       return []; // Return empty array if we can't process the response
@@ -311,7 +342,7 @@ export const getNormalImages = async (limit: number = 5): Promise<AnomalyObject[
     
     return selected.map((item: any) => enhanceAnomalyData({
       ...item,
-      imageUrl: `${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_FILE(item.id)}`
+      imageUrl: item.imageUrl || `/api${API_ENDPOINTS.GET_IMAGE_FILE(item.id)}`
     }));
   } catch (err) {
     return handleApiError(err);
@@ -323,7 +354,7 @@ export const getNormalImages = async (limit: number = 5): Promise<AnomalyObject[
  */
 export const getAnomalyById = async (id: string): Promise<AnomalyObject | null> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_DETAILS(id)}`);
+    const response = await fetch(`/api/anomalies/${id}`);
     
     if (!response.ok) {
       if (response.status === 404) {
@@ -333,11 +364,13 @@ export const getAnomalyById = async (id: string): Promise<AnomalyObject | null> 
     }
     
     const data = await response.json();
-    return {
+    
+    // Enhance the data with additional information for display
+    return enhanceAnomalyData({
       ...data,
-      // Generate an image URL using the image file endpoint
-      imageUrl: `${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_FILE(data.id)}`
-    };
+      // Generate an image URL if not already present
+      imageUrl: data.imageUrl || `/api${API_ENDPOINTS.GET_IMAGE_FILE(data.id)}`
+    });
   } catch (err) {
     return handleApiError(err);
   }
@@ -353,7 +386,8 @@ export const submitAnomalyFeedback = async (id: string, feedback: {
   rating?: number;
 }): Promise<AnomalyObject | null> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CLASSIFY_IMAGE(id)}`, {
+    // Use the Next.js API route
+    const response = await fetch(`/api/anomalies/${id}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -379,8 +413,8 @@ export const submitAnomalyFeedback = async (id: string, feedback: {
         comments: feedback.comments,
         rating: feedback.rating
       },
-      // Generate an image URL using the image file endpoint
-      imageUrl: `${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_FILE(data.id)}`
+      // Generate an image URL using the image file endpoint if not present
+      imageUrl: data.imageUrl || `/api${API_ENDPOINTS.GET_IMAGE_FILE(data.id)}`
     });
   } catch (err) {
     return handleApiError(err);
@@ -394,7 +428,6 @@ export const getStatistics = async (useDashboard = false): Promise<{
   total_images: number;
   anomaly_count: number;
   normal_count: number;
-  processing_time_avg: number;
   storage_type?: string;
   storage_location?: string;
   anomalies_detected?: number;
@@ -407,9 +440,14 @@ export const getStatistics = async (useDashboard = false): Promise<{
   recent_activity?: any[];
 }> => {
   try {
-    // Use the dashboard statistics endpoint if requested (more comprehensive stats)
-    const endpoint = useDashboard ? API_ENDPOINTS.DASHBOARD_STATISTICS : API_ENDPOINTS.STATISTICS;
-    const response = await fetch(`${API_BASE_URL}${endpoint}`);
+    // Add dashboard parameter if needed
+    const queryParams = new URLSearchParams();
+    if (useDashboard) {
+      queryParams.append('dashboard', 'true');
+    }
+    
+    // Use the Next.js API route
+    const response = await fetch(`/api/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
     
     if (!response.ok) {
       throw new Error(`Error fetching statistics: ${response.statusText}`);
@@ -422,7 +460,6 @@ export const getStatistics = async (useDashboard = false): Promise<{
       total_images: data.total_images,
       anomaly_count: data.anomalies_detected || data.total_anomalies || 0,
       normal_count: data.total_images - (data.anomalies_detected || data.total_anomalies || 0),
-      processing_time_avg: data.average_processing_time || data.average_anomaly_score || 0,
       // Include the original API fields too
       ...data
     };
@@ -447,7 +484,8 @@ export const processImage = async (imageFile: File): Promise<{
     const formData = new FormData();
     formData.append('file', imageFile);
     
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PROCESS}`, {
+    // Use the Next.js API route
+    const response = await fetch(`/api/process-image`, {
       method: 'POST',
       body: formData,
     });
@@ -476,8 +514,9 @@ export const submitBatchClassification = async (request: {
   failed_ids: string[];
 }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.BATCH_CLASSIFY}`, {
-      method: 'PATCH', // Using PATCH as specified in the OpenAPI spec
+    // Use the Next.js API route - using PATCH method as per OpenAPI spec
+    const response = await fetch(`/api/batch-classify`, {
+      method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -515,7 +554,8 @@ export const getClassificationHistory = async (imageId: string): Promise<{
   }>;
 }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CLASSIFICATION_HISTORY(imageId)}`);
+    // Use the Next.js API route
+    const response = await fetch(`/api/anomalies/${imageId}/classifications`);
     
     if (!response.ok) {
       throw new Error(`Error fetching classification history: ${response.statusText}`);
@@ -552,7 +592,8 @@ export const getSimilarImages = async (
       min_score: minScore.toString()
     });
     
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.SIMILAR_IMAGES(imageId)}?${queryParams}`);
+    // Use the Next.js API route
+    const response = await fetch(`/api/anomalies/${imageId}/similarities?${queryParams}`);
     
     if (!response.ok) {
       throw new Error(`Error fetching similar images: ${response.statusText}`);
@@ -567,7 +608,7 @@ export const getSimilarImages = async (
         ...item,
         image: enhanceAnomalyData({
           ...item.image,
-          imageUrl: `${API_BASE_URL}${API_ENDPOINTS.GET_IMAGE_FILE(item.image.id)}`
+          imageUrl: item.image.imageUrl || `/api${API_ENDPOINTS.GET_IMAGE_FILE(item.image.id)}`
         })
       }))
     };
@@ -597,7 +638,8 @@ export const getImageVisualizations = async (imageId: string): Promise<{
   anomaly_score: number;
 }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.VISUALIZATION(imageId)}`);
+    // Use the Next.js API route
+    const response = await fetch(`/api/anomalies/${imageId}/visualization`);
     
     if (!response.ok) {
       throw new Error(`Error fetching image visualizations: ${response.statusText}`);
@@ -647,7 +689,8 @@ export const createPcaVisualization = async (options?: {
   is_interactive?: boolean;
 }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PCA_VISUALIZATION}`, {
+    // Use the Next.js API route
+    const response = await fetch(`/api/visualizations/pca`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -710,7 +753,8 @@ export const exportImages = async (
       queryParams.append('sort_by', sort_by);
     }
     
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.EXPORT_IMAGES}?${queryParams}`);
+    // Use the Next.js API route
+    const response = await fetch(`/api/images/export?${queryParams}`);
     
     if (!response.ok) {
       throw new Error(`Error exporting images: ${response.statusText}`);

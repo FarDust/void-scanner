@@ -17,6 +17,40 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
+  // Asegurarse de que imageUrl sea siempre una cadena, no un objeto HTMLImageElement
+  const getImageSrc = (): string => {
+    try {
+      if (!anomaly.imageUrl) return '';
+      
+      // Si es una cadena, devolver directamente
+      if (typeof anomaly.imageUrl === 'string') {
+        return anomaly.imageUrl;
+      }
+      
+      // Si es un objeto HTMLImageElement, devolver su src
+      if (anomaly.imageUrl instanceof HTMLImageElement) {
+        return anomaly.imageUrl.src || '';
+      }
+      
+      // Si es un objeto con propiedad 'src'
+      if (typeof anomaly.imageUrl === 'object' && 'src' in anomaly.imageUrl) {
+        return (anomaly.imageUrl as any).src || '';
+      }
+      
+      // Si llegamos aquí y anomaly.imageUrl es un objeto, convertir a string para evitar errores de renderizado
+      if (typeof anomaly.imageUrl === 'object') {
+        return PLACEHOLDER_IMAGE_URL;
+      }
+      
+      return String(anomaly.imageUrl);
+    } catch (error) {
+      console.error('Error processing image URL:', error);
+      return '';
+    }
+  };
+
+  const imageUrl = getImageSrc();
+
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -50,9 +84,9 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
   return (
     <div className="group bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden w-full max-w-md border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700">
       <div className="relative h-64 w-full overflow-hidden">
-        {anomaly.imageUrl ? (
+        {imageUrl && (
           <Image
-            src={anomaly.imageUrl}
+            src={imageUrl}
             alt={anomaly.metadata?.objectName || 'Astronomical anomaly'}
             fill
             sizes="(max-width: 768px) 100vw, 500px"
@@ -61,7 +95,8 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
             placeholder="blur"
             blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFdwI2QOQvuQAAAABJRU5ErkJggg=="
           />
-        ) : (
+        )}
+        {!imageUrl && (
           <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700">
             <p className="text-gray-500 dark:text-gray-400">No image available</p>
           </div>

@@ -21,7 +21,7 @@ const demoAnomalies: AnomalyObject[] = [
     file_path: '',
     is_anomaly: true,
     type: 'Training Example',
-    imageUrl: 'https://science.nasa.gov/wp-content/uploads/2023/04/opo0019b-jpg.webp',
+    imageUrl: 'https://cdn.esahubble.org/archives/images/screen/heic0601a.jpg',
     coordinates: { ra: 83.82208, dec: -5.39111 },
     metadata: {
       objectName: 'Orion Nebula Example',
@@ -175,7 +175,6 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
       total_images: demoAnomalies.length,
       anomaly_count: demoAnomalies.length,
       normal_count: 0,
-      processing_time_avg: 1.2,
       storage_type: 'Demo Storage',
       classified_images: 0,
       average_anomaly_score: 0.85
@@ -968,10 +967,6 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
               <div className="text-xl font-semibold text-blue-500">{apiStats.normal_count}</div>
               <div>Normal</div>
             </div>
-            <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded">
-              <div className="text-xl font-semibold">{apiStats.processing_time_avg !== undefined ? apiStats.processing_time_avg.toFixed(2) : '0.00'}s</div>
-              <div>Avg. Time</div>
-            </div>
           </div>
         </div>
       </div>
@@ -988,16 +983,6 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
   const coordinates = currentAnomaly.coordinates;
   const discoveryDate = currentAnomaly.metadata?.discoveryDate || 'Unknown';
   const instrument = currentAnomaly.metadata?.instrument || 'Unknown';
-
-  // Validate image URL before rendering
-  const isValidImageUrl = (url) => {
-    try {
-      const parsedUrl = new URL(url);
-      return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
 
   // We already have handleFindSimilar defined above, no need for a duplicate
 
@@ -1083,7 +1068,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           ${animateDirection === 'left' ? '-translate-x-full opacity-0' : animateDirection === 'right' ? 'translate-x-full opacity-0' : ''}`}
       >
         <div className="relative h-56 sm:h-64 md:h-72 w-full">
-          {currentAnomaly.imageUrl && isValidImageUrl(currentAnomaly.imageUrl) ? (
+          {currentAnomaly.imageUrl ? (
             <Image
               src={currentAnomaly.imageUrl}
               alt={objectName}
@@ -1124,9 +1109,6 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
             )}
             <p>Discovery: {discoveryDate}</p>
             <p>Instrument: {instrument}</p>
-            {currentAnomaly.processing_time && (
-              <p>Processing time: {currentAnomaly.processing_time.toFixed(2)}s</p>
-            )}
             
             {/* Find Similar button */}
             <button
@@ -1278,7 +1260,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
       {/* System statistics */}
       <div className="mt-8 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md">
         <h3 className="font-bold text-lg mb-2">System Statistics</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
           <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
             <div className="text-xl font-semibold">{apiStats.total_images}</div>
             <div>Total Images</div>
@@ -1290,10 +1272,6 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
             <div className="text-xl font-semibold text-blue-500">{apiStats.normal_count}</div>
             <div>Normal</div>
-          </div>
-          <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-            <div className="text-xl font-semibold">{apiStats.processing_time_avg !== undefined ? apiStats.processing_time_avg.toFixed(2) : '0.00'}s</div>
-            <div>Avg. Time</div>
           </div>
         </div>
         

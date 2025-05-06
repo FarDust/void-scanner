@@ -38,10 +38,9 @@ export default function Home() {
 
   // Effect to fetch API health status
   useEffect(() => {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
     const fetchHealthStatus = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/health`);
+        const response = await fetch(`/api/health`);
         if (!response.ok) {
           throw new Error(`Health check failed with status: ${response.status}`);
         }
@@ -213,7 +212,7 @@ export default function Home() {
               </svg>
               <span className="font-semibold">Void Scanner</span>
             </div>
-            <span>© 2025</span>
+            <span>FarDust © 2025</span>
           </div>
         </div>
       </footer>
