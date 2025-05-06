@@ -2,7 +2,7 @@
 
 ## Astronomical Anomaly Detection System
 
-*Current Version: 1.0.0 (April 26, 2025)*
+*Current Version: 1.0.0 (May 6, 2025)*
 
 Void Scanner is a modern web application designed to help astronomers and researchers analyze and classify astronomical images, with a focus on detecting and categorizing anomalies in celestial data.
 
@@ -80,6 +80,45 @@ To import pre-calculated anomaly detection data:
 1. Click the "Sync Data" button in the interface header
 2. Wait for the sync process to complete
 3. New anomalies will be available for review
+
+## Deployment
+
+### Deploying to Vercel
+
+This project is configured for easy deployment on Vercel:
+
+1. Push your code to a Git repository (GitHub, GitLab, or Bitbucket)
+
+2. Log in to [Vercel](https://vercel.com) and create a new project
+
+3. Import your Git repository
+
+4. Configure the following environment variables in the Vercel project settings:
+   ```
+   NEXT_PUBLIC_API_URL=https://your-api-endpoint.com
+   ```
+
+5. Deploy! Vercel will automatically build and deploy your application
+
+6. After deployment, you can configure custom domains and other settings in the Vercel dashboard
+
+### Manual Deployment
+
+If you prefer to deploy manually:
+
+1. Build the application:
+   ```bash
+   npm run build
+   # or
+   yarn build
+   ```
+
+2. Start the production server:
+   ```bash
+   npm run start
+   # or
+   yarn start
+   ```
 
 ## Backend Setup
 
