@@ -17,7 +17,7 @@ interface StatisticData {
   false_negatives?: number;
   storage_type: string;
   storage_location: string;
-  recent_activity?: any[];
+  recent_activity?: { event: string; timestamp: string; image_id: string }[];
   user_agreement?: number;
 }
 
@@ -46,7 +46,6 @@ const demoStatistics: StatisticData = {
 export default function StatisticsPanel({ userMode = false }: { userMode?: boolean }) {
   const [stats, setStats] = useState<StatisticData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'system'>('system');
   const [demoMode, setDemoMode] = useState(false);
 
@@ -68,7 +67,14 @@ export default function StatisticsPanel({ userMode = false }: { userMode?: boole
           unclassified_anomalies: data.unclassified_anomalies || 0,
           false_positives: data.false_positives || 0,
           false_negatives: data.false_negatives || 0,
-          recent_activity: data.recent_activity || [],
+          // Transform recent_activity to match the expected format
+          recent_activity: data.recent_activity 
+            ? data.recent_activity.map(activity => ({
+                event: activity.description,
+                timestamp: activity.timestamp,
+                image_id: activity.user || 'system'
+              })) 
+            : [],
           // Use user_agreement directly from the API if available
           user_agreement: data.user_agreement || 
             (data.user_confirmed_anomalies && data.total_images 
@@ -160,7 +166,7 @@ export default function StatisticsPanel({ userMode = false }: { userMode?: boole
               <p className="text-sm text-gray-500 dark:text-gray-400">Anomalies Detected</p>
               <p className="text-2xl font-bold">{stats?.anomalies_detected.toLocaleString()}</p>
               <p className="text-xs text-gray-500">
-                ({((stats?.anomalies_detected / stats?.total_images) * 100 || 0).toFixed(1)}%)
+                ({((stats?.anomalies_detected ?? 0) / (stats?.total_images ?? 1) * 100 || 0).toFixed(1)}%)
               </p>
             </div>
             
@@ -168,7 +174,7 @@ export default function StatisticsPanel({ userMode = false }: { userMode?: boole
               <p className="text-sm text-gray-500 dark:text-gray-400">Classified</p>
               <p className="text-2xl font-bold">{stats?.classified_images.toLocaleString()}</p>
               <p className="text-xs text-gray-500">
-                ({((stats?.classified_images / stats?.total_images) * 100 || 0).toFixed(1)}%)
+                ({((stats?.classified_images ?? 0) / (stats?.total_images ?? 1) * 100 || 0).toFixed(1)}%)
               </p>
             </div>
             

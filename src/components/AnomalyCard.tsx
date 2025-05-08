@@ -1,5 +1,7 @@
 'use client';
 
+const PLACEHOLDER_IMAGE_URL = ''; // Replace with your actual placeholder image path
+
 import { useState } from 'react';
 import Image from 'next/image';
 import { AnomalyObject, submitAnomalyFeedback } from '../services/anomalyService';
@@ -12,7 +14,7 @@ interface AnomalyCardProps {
 export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardProps) {
   const [showFeedback, setShowFeedback] = useState(false);
   const [classification, setClassification] = useState('');
-  const [rating, setRating] = useState<number | undefined>(undefined);
+  const [rating, ] = useState<number | undefined>(undefined);
   const [comments, setComments] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
@@ -27,14 +29,9 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
         return anomaly.imageUrl;
       }
       
-      // Si es un objeto HTMLImageElement, devolver su src
-      if (anomaly.imageUrl instanceof HTMLImageElement) {
-        return anomaly.imageUrl.src || '';
-      }
-      
       // Si es un objeto con propiedad 'src'
       if (typeof anomaly.imageUrl === 'object' && 'src' in anomaly.imageUrl) {
-        return (anomaly.imageUrl as any).src || '';
+        return (anomaly.imageUrl as { src: string }).src || '';
       }
       
       // Si llegamos aquí y anomaly.imageUrl es un objeto, convertir a string para evitar errores de renderizado
@@ -87,7 +84,7 @@ export default function AnomalyCard({ anomaly, onFeedbackSubmit }: AnomalyCardPr
         {imageUrl && (
           <Image
             src={imageUrl}
-            alt={anomaly.metadata?.objectName || 'Astronomical anomaly'}
+            alt={String(anomaly.metadata instanceof String ? anomaly.metadata.objectName : 'Astronomical anomaly')}
             fill
             sizes="(max-width: 768px) 100vw, 500px"
             className="object-cover transition-transform duration-500 group-hover:scale-105"

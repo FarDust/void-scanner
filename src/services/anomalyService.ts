@@ -19,7 +19,7 @@ export interface AnomalyObject {
     ra: number; // Right ascension
     dec: number; // Declination
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, string | number | boolean | null>;
   processing_time?: number;
   imageUrl?: string;
   userFeedback?: {
@@ -52,9 +52,12 @@ const API_ENDPOINTS = {
 /**
  * Helper function to handle API errors
  */
-const handleApiError = (err: any): never => {
+const handleApiError = (err: unknown): never => {
   console.error('API Error:', err);
-  throw new Error(err?.message || 'An error occurred while fetching data');
+  if (err instanceof Error) {
+    throw new Error(err?.message)
+  }
+  throw new Error('An error occurred while fetching data');
 };
 
 /**
@@ -71,7 +74,10 @@ export const parseFilenameInfo = (filename: string): {
   // Default return object
   const result = {
     coordinates: { x: 0, y: 0 },
-    instrument: 'Unknown'
+    instrument: 'Unknown',
+    sector: undefined as string | undefined, // Add sector property
+    camera: undefined as string | undefined, // Add camera property
+    ccd: undefined as string | undefined // Add ccd property
   };
   
   try {
@@ -118,7 +124,7 @@ const enhanceAnomalyData = (anomaly: AnomalyObject): AnomalyObject => {
   }
   
   // Use filename from either the filename field or extract from file_path
-  const filename = anomaly.filename || anomaly.file_path.split('/').pop() || '';
+  const filename = anomaly.filename || (anomaly.file_path?.split('/').pop() ?? '') || '';
   
   // Parse the filename for additional data
   const fileInfo = parseFilenameInfo(filename);
@@ -194,7 +200,7 @@ export const syncAnomalyData = async (): Promise<{
   } catch (err) {
     return {
       success: false,
-      message: err?.message || 'An error occurred while syncing data',
+      message: err instanceof Error ? err.message : 'An error occurred while syncing data',
       imported_count: 0,
     };
   }
@@ -281,7 +287,7 @@ export const getAnomalies = async (
     const currentPage = responseData.page || page;
     
     // Enhance each anomaly with additional data for UI display
-    const enhancedData = results.map((item: any) => enhanceAnomalyData({
+    const enhancedData = results.map((item: AnomalyObject) => enhanceAnomalyData({
       ...item,
       imageUrl: `/api${API_ENDPOINTS.GET_IMAGE_FILE(item.id)}`
     }));
@@ -294,7 +300,7 @@ export const getAnomalies = async (
     };
   } catch (err) {
     console.error('Error fetching anomalies:', err);
-    throw new Error(err?.message || 'An error occurred while fetching anomalies');
+    throw new Error(err instanceof Error ? err.message : 'An error occurred while fetching anomalies');
   }
 };
 
@@ -317,7 +323,7 @@ export const getNormalImages = async (limit: number = 5): Promise<AnomalyObject[
     const responseData = await response.json();
     
     // Process the response
-    let normalImages: any[] = [];
+    let normalImages: AnomalyObject[] = [];
     
     if (responseData && responseData.results && Array.isArray(responseData.results)) {
       normalImages = responseData.results;
@@ -340,7 +346,7 @@ export const getNormalImages = async (limit: number = 5): Promise<AnomalyObject[
       selected = Array.from(indices).map(i => normalImages[i]);
     }
     
-    return selected.map((item: any) => enhanceAnomalyData({
+    return selected.map((item: AnomalyObject) => enhanceAnomalyData({
       ...item,
       imageUrl: item.imageUrl || `/api${API_ENDPOINTS.GET_IMAGE_FILE(item.id)}`
     }));
@@ -437,7 +443,12 @@ export const getStatistics = async (useDashboard = false): Promise<{
   unclassified_anomalies?: number;
   false_positives?: number;
   false_negatives?: number;
-  recent_activity?: any[];
+  user_agreement?: number; // Added this field
+  recent_activity?: Array<{
+    timestamp: string;
+    description: string;
+    user?: string;
+  }>;
 }> => {
   try {
     // Add dashboard parameter if needed
@@ -536,7 +547,7 @@ export const submitBatchClassification = async (request: {
     };
   } catch (err) {
     console.error('Error in batch classification:', err);
-    throw new Error(err?.message || 'An error occurred while submitting batch classification');
+    throw new Error(err instanceof Error ? err.message : 'An error occurred while submitting batch classification');
   }
 };
 
@@ -604,7 +615,7 @@ export const getSimilarImages = async (
     // Enhance the returned data for UI display
     const enhancedData = {
       reference_image_id: data.reference_image_id,
-      similar_images: data.similar_images.map((item: any) => ({
+      similar_images: data.similar_images.map((item: { image: AnomalyObject; similarity_score: number }) => ({
         ...item,
         image: enhanceAnomalyData({
           ...item.image,
@@ -682,7 +693,7 @@ export const createPcaVisualization = async (options?: {
   include_image_paths?: boolean;
 }): Promise<{
   visualization: string;
-  projection_data?: any;
+  projection_data?: Record<string, unknown>;
   anomaly_threshold: number;
   total_points: number;
   anomaly_count: number;
