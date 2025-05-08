@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (is_classified !== undefined) queryParams.append('is_classified', is_classified.toString());
     if (user_classification !== undefined) queryParams.append('user_classification', user_classification.toString());
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/search?${queryParams}`, {
+    const response = await fetch(`${process.env.API_URL}/images/search?${queryParams}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

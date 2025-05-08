@@ -26,10 +26,10 @@ export default async function handler(
 
   try {
     // Get the API URL from environment variables
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const apiUrl = process.env.API_URL;
     
     if (!apiUrl) {
-      throw new Error('NEXT_PUBLIC_API_URL environment variable is not defined');
+      throw new Error('API_URL environment variable is not defined');
     }
 
     // Make a request to the actual API's health endpoint

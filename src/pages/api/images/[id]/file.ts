@@ -13,11 +13,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Fetch the image from the backend API
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      throw new Error('NEXT_PUBLIC_API_URL environment variable is not defined');
+    if (!process.env.API_URL) {
+      throw new Error('API_URL environment variable is not defined');
     }
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${id}/file`);
+    const response = await fetch(`${process.env.API_URL}/images/${id}/file`);
 
     if (response.status === 404) {
       return res.status(404).json({ error: 'Image not found' });

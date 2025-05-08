@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'is_anomaly field must be a boolean' });
     }
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/classifications`, {
+    const response = await fetch(`${process.env.API_URL}/images/classifications`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

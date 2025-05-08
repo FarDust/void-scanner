@@ -42,7 +42,7 @@ Void Scanner is a modern web application designed to help astronomers and resear
 3. Set up environment variables:
    Create a `.env.local` file in the root directory with the following content:
    ```
-   NEXT_PUBLIC_API_URL=http://localhost:8080
+   API_URL=http://localhost:8080
    ```
    Adjust the URL to match your backend service endpoint.
 
@@ -95,7 +95,7 @@ This project is configured for easy deployment on Vercel:
 
 4. Configure the following environment variables in the Vercel project settings:
    ```
-   NEXT_PUBLIC_API_URL=https://your-api-endpoint.com
+   API_URL=https://your-api-endpoint.com
    ```
 
 5. Deploy! Vercel will automatically build and deploy your application

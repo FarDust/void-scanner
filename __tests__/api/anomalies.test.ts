@@ -75,7 +75,7 @@ describe('/api/anomalies API Route', () => {
     expect(res._getJSONData()).toEqual(mockData);
     
     // Verify that fetch was called with the correct URL and parameters
-    const expectedUrl = `${process.env.NEXT_PUBLIC_API_URL}/images/search?page=1&page_size=12&is_anomaly=true`;
+    const expectedUrl = `${process.env.API_URL}/images/search?page=1&page_size=12&is_anomaly=true`;
     expect(global.fetch).toHaveBeenCalledWith(
       expectedUrl,
       expect.objectContaining({

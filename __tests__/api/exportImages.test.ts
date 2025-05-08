@@ -83,7 +83,7 @@ describe('/api/images/export API Route', () => {
     
     // Verify that fetch was called with the correct URL
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining(`${process.env.NEXT_PUBLIC_API_URL}/images/export?`),
+      expect.stringContaining(`${process.env.API_URL}/images/export?`),
       expect.objectContaining({
         method: 'GET'
       })
