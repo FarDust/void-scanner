@@ -139,9 +139,7 @@ export function useImageCache() {
       lastStorageUpdateTime = now;
       needsUpdate.current = false;
       
-      // Get localStorage size for stats - but don't update state here
-      // as that would trigger a render and potentially another useEffect call
-      const localStorageSize = localStorage.getItem(LOCAL_STORAGE_KEY)?.length || 0;
+      localStorage.getItem(LOCAL_STORAGE_KEY);
       
       // We'll update stats in a separate effect, to avoid the infinite loop
     } catch (error) {

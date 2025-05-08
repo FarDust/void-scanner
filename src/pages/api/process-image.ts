@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const form = formidable({ multiples: false });
-    const [ fields, files ] = await form.parse(req);
+    const [ , files ] = await form.parse(req);
 
     const file = files.file?.[0];
     if (!file) {
@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       contentType: file.mimetype || 'image/png',
     });
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images`, {
+    const response = await fetch(`${process.env.API_URL}/images`, {
       method: 'POST',
       body: formData,
       headers: formData.getHeaders(),

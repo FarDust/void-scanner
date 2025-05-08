@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Forward the request body to the backend API
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/visualizations/pca`, {
+    const response = await fetch(`${process.env.API_URL}/visualizations/pca`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

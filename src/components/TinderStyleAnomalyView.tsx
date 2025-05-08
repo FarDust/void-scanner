@@ -75,7 +75,16 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
   const [backendConnectionFailed, setBackendConnectionFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [apiStats, setApiStats] = useState<any>(null);
+  interface ApiStats {
+    total_images: number;
+    anomaly_count: number;
+    normal_count: number;
+    storage_type: string;
+    classified_images: number;
+    average_anomaly_score: number;
+  }
+
+  const [apiStats, setApiStats] = useState<ApiStats | null>(null);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showDetailedForm, setShowDetailedForm] = useState(false);
   const [showBatchClassifyForm, setShowBatchClassifyForm] = useState(false); // New state for batch classify form
@@ -96,7 +105,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
   });
   
   // Use our custom image cache hook
-  const { preloadImage, preloadImages, isImageCached, cacheStats } = useImageCache();
+  const { preloadImages, isImageCached, cacheStats } = useImageCache();
   
   // New state for preloaded images
   const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
@@ -117,22 +126,23 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
       // First preload the next 3 images in sequence for quick access
       const priorityUrls = imageUrls.slice(currentIndex, currentIndex + 3);
       if (priorityUrls.length > 0) {
-        await preloadImages(priorityUrls, false); // false = sequential loading
+        const urls = priorityUrls.filter((url): url is string => !!url)
+        await preloadImages(urls, false); // false = sequential loading
         
         // Update preloaded images record
         const newPreloadedSet = new Set(preloadedImages);
-        priorityUrls.forEach(url => newPreloadedSet.add(url));
+        priorityUrls.filter((url): url is string => !!url).forEach(url => newPreloadedSet.add(url));
         setPreloadedImages(newPreloadedSet);
       }
       
       // Then preload the rest in parallel
       const remainingUrls = imageUrls.slice(currentIndex + 3);
       if (remainingUrls.length > 0) {
-        preloadImages(remainingUrls, true); // true = parallel loading
+        preloadImages(remainingUrls.filter((url): url is string => !!url), true); // true = parallel loading
         
         // Update preloaded images record
         const newPreloadedSet = new Set(preloadedImages);
-        remainingUrls.forEach(url => newPreloadedSet.add(url));
+        remainingUrls.filter((url): url is string => !!url).forEach(url => newPreloadedSet.add(url));
         setPreloadedImages(newPreloadedSet);
       }
     };
@@ -428,7 +438,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
             setBackendConnectionFailed(false);
             
             // Mix in some normal images with the anomalous ones for better training
-            let mixedData = [...anomaliesData];
+            const mixedData = [...anomaliesData];
             
             if (normalImagesData && normalImagesData.length > 0) {
               // Add a normal image every few anomalies
@@ -450,9 +460,14 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
             }
             
             setAnomalies(mixedData);
-            setApiStats(statsData);
+            setApiStats({
+              ...statsData,
+              storage_type: statsData.storage_type || 'Unknown', // Ensure storage_type is always defined
+              classified_images: statsData.classified_images ?? 0, // Provide a default value for classified_images
+              average_anomaly_score: statsData.average_anomaly_score ?? 0, // Provide a default value for average_anomaly_score
+            });
             
-          } catch (err: any) {
+          } catch (err: unknown) {
             console.error('Error connecting to backend:', err);
             setBackendConnectionFailed(true);
             
@@ -582,7 +597,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
                       : [];
                   
                   // Mix in some normal images with the anomalous ones
-                  let mixedData = [...anomaliesData];
+                  const mixedData = [...anomaliesData];
                   
                   if (normalImagesData && normalImagesData.length > 0) {
                     const normalInterval = Math.max(3, Math.floor(anomaliesData.length / normalImagesData.length));
@@ -597,7 +612,12 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
                   }
                   
                   setAnomalies(mixedData);
-                  setApiStats(statsData);
+                  setApiStats({
+                    ...statsData,
+                    storage_type: statsData.storage_type || 'Unknown', // Ensure storage_type is always defined
+                    classified_images: statsData.classified_images ?? 0, // Provide a default value for classified_images
+                    average_anomaly_score: statsData.average_anomaly_score ?? 0, // Provide a default value for average_anomaly_score
+                  });
                 } catch (err) {
                   console.error('Error refreshing data:', err);
                   setError('Failed to refresh data after sync.');
@@ -619,105 +639,27 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
       }
       
       return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error syncing data:', err);
       
       // Always reset loading state on error
       setLoading(false);
       
       // If this was a silent sync, don't show error UI
-      if (!silent) {
+      if (err instanceof Error && !silent) {
         setSyncStatus({
           syncing: false,
-          message: err.message || 'Failed to sync anomaly data',
+          message: err instanceof Error ? err.message : 'Failed to sync anomaly data',
           success: false
         });
       }
       
       return {
         success: false,
-        message: err.message || 'Failed to sync anomaly data',
+        message: err instanceof Error ? err.message : 'Failed to sync anomaly data',
         imported_count: 0
       };
     }
-  };
-
-  // Similar Images Modal - Improved UI and keyboard navigation
-  const renderSimilarImagesModal = () => {
-    if (!showSimilarImages) return null;
-    
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div 
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto animate-fade-in"
-          tabIndex={-1} // Make div focusable
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setShowSimilarImages(false);
-            // Tab trap inside modal
-            if (e.key === 'Tab') {
-              const focusableElements = e.currentTarget.querySelectorAll(
-                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-              );
-              const firstElement = focusableElements[0] as HTMLElement;
-              const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
-              
-              if (e.shiftKey && document.activeElement === firstElement) {
-                e.preventDefault();
-                lastElement.focus();
-              } else if (!e.shiftKey && document.activeElement === lastElement) {
-                e.preventDefault();
-                firstElement.focus();
-              }
-            }
-          }}
-        >
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold">Similar Images</h3>
-            <button 
-              onClick={() => setShowSimilarImages(false)}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"
-              aria-label="Close modal"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {fetchingSimilar ? (
-            <div className="flex flex-col items-center justify-center p-10">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-              <p className="text-gray-600 dark:text-gray-300">Finding similar anomalies...</p>
-            </div>
-          ) : similarImages.length === 0 ? (
-            <div className="text-center py-10">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              <p className="text-gray-600 dark:text-gray-300">No similar images found.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {similarImages.map((img, index) => (
-                <div key={index} className="relative h-32 w-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden rounded">
-                  <Image
-                    src={img.image.imageUrl}
-                    alt={`Similar image ${index + 1}`}
-                    fill
-                    style={{ objectFit: 'cover' }}
-                    className="transition-opacity duration-300 opacity-100"
-                    sizes="(max-width: 768px) 50vw, 150px"
-                  />
-                  <div className="absolute bottom-0 left-0 bg-black/70 text-white text-xs px-2 py-1">
-                    Similarity: {(img.similarity_score * 100).toFixed(2)}%
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
   };
 
   // The main render method
@@ -744,7 +686,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
         <div className="text-center mb-8">
           <h2 className="text-2xl md:text-3xl font-bold mb-3">No Anomalies Found</h2>
           <p className="text-gray-600 dark:text-gray-300">
-            The system hasn't detected any anomalies yet. You can sync data from external sources or try the demo mode.
+            The system hasn&apos;t detected any anomalies yet. You can sync data from external sources or try the demo mode.
           </p>
         </div>
 
@@ -924,7 +866,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
                 ←
               </div>
               <h4 className="font-semibold mb-1">Left Arrow</h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">Mark as "Not Interesting"</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">Mark as &quot;Not Interesting&quot;</p>
             </div>
             
             <div className="flex flex-col items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -932,7 +874,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
                 →
               </div>
               <h4 className="font-semibold mb-1">Right Arrow</h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">Mark as "Interesting"</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">Mark as &quot;Interesting&quot;</p>
             </div>
             
             <div className="flex flex-col items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -956,15 +898,15 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           <h3 className="text-xl font-bold mb-4">System Statistics</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded">
-              <div className="text-xl font-semibold">{apiStats.total_images}</div>
+              <div className="text-xl font-semibold">{apiStats ? apiStats.total_images : 'N/A'}</div>
               <div>Total Images</div>
             </div>
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded">
-              <div className="text-xl font-semibold text-amber-500">{apiStats.anomaly_count}</div>
+              <div className="text-xl font-semibold text-amber-500">{apiStats?.anomaly_count ?? 'N/A'}</div>
               <div>Anomalies</div>
             </div>
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded">
-              <div className="text-xl font-semibold text-blue-500">{apiStats.normal_count}</div>
+              <div className="text-xl font-semibold text-blue-500">{apiStats?.normal_count ?? 'N/A'}</div>
               <div>Normal</div>
             </div>
           </div>
@@ -1071,7 +1013,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
           {currentAnomaly.imageUrl ? (
             <Image
               src={currentAnomaly.imageUrl}
-              alt={objectName}
+              alt={String(objectName)}
               fill
               priority={!isImageCached(currentAnomaly.imageUrl)} // Only use priority if not cached
               quality={75}
@@ -1083,9 +1025,15 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
               onLoad={() => {
                 // Ensure this URL is marked as preloaded
                 if (currentAnomaly.imageUrl && !preloadedImages.has(currentAnomaly.imageUrl)) {
-                  setPreloadedImages(prev => new Set(prev).add(currentAnomaly.imageUrl));
+                  setPreloadedImages(prev => {
+                    const set = new Set(prev)
+                    if (currentAnomaly.imageUrl) {
+                      set.add(currentAnomaly.imageUrl);
+                    }
+                    return set;
+                  })};
                 }
-              }}
+              }
             />
           ) : (
             <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
@@ -1262,15 +1210,15 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
         <h3 className="font-bold text-lg mb-2">System Statistics</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
           <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-            <div className="text-xl font-semibold">{apiStats.total_images}</div>
+            <div className="text-xl font-semibold">{apiStats ? apiStats.total_images : 'N/A'}</div>
             <div>Total Images</div>
           </div>
           <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-            <div className="text-xl font-semibold text-amber-500">{apiStats.anomaly_count}</div>
+            <div className="text-xl font-semibold text-amber-500">{apiStats?.anomaly_count ?? 'N/A'}</div>
             <div>Anomalies</div>
           </div>
           <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-            <div className="text-xl font-semibold text-blue-500">{apiStats.normal_count}</div>
+            <div className="text-xl font-semibold text-blue-500">{apiStats?.normal_count ?? 'N/A'}</div>
             <div>Normal</div>
           </div>
         </div>
@@ -1480,7 +1428,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
                   <div className="flex-shrink-0 w-20 h-20 relative mr-4 overflow-hidden rounded bg-black">
                     <Image
                       src={currentAnomaly.imageUrl}
-                      alt={objectName}
+                      alt={String(objectName)}
                       fill
                       style={{ objectFit: 'cover' }}
                       className="opacity-90"
@@ -1711,7 +1659,7 @@ export default function TinderStyleAnomalyView({ demoControlsVisible = false }: 
                 {similarImages.map((img, index) => (
                   <div key={index} className="relative h-32 w-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden rounded">
                     <Image
-                      src={img.image.imageUrl}
+                      src={img.image.imageUrl || '/fallback-image.jpg'}
                       alt={`Similar image ${index + 1}`}
                       fill
                       style={{ objectFit: 'cover' }}

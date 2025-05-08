@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${id}/classifications`, {
+    const response = await fetch(`${process.env.API_URL}/images/${id}/classifications`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

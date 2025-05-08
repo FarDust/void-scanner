@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (sort_by) queryParams.append('sort_by', sort_by.toString());
 
     // Forward the request to the backend API
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/export?${queryParams}`, {
+    const response = await fetch(`${process.env.API_URL}/images/export?${queryParams}`, {
       method: 'GET',
     });
 

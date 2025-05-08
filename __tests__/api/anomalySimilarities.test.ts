@@ -126,7 +126,7 @@ describe('/api/anomalies/[id]/similarities API Route', () => {
     expect(res._getJSONData()).toEqual(mockData);
     
     // Verify that fetch was called with the correct URL including query parameters
-    const expectedUrl = `${process.env.NEXT_PUBLIC_API_URL}/images/${anomalyId}/similarities?limit=5&min_score=0.7`;
+    const expectedUrl = `${process.env.API_URL}/images/${anomalyId}/similarities?limit=5&min_score=0.7`;
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining(expectedUrl),
       expect.objectContaining({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { processImage } from '../services/anomalyService';
 
@@ -88,10 +88,10 @@ export default function ImageUploader() {
       try {
         const result = await processImage(file);
         setResult(result);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error processing image:", err);
         // Check if it's a server error (likely API is down)
-        if (err.message && (
+        if (err instanceof Error && err.message && (
             err.message.includes("Internal Server Error") || 
             err.message.includes("Network Error") ||
             err.message.includes("Failed to fetch")
@@ -118,10 +118,18 @@ export default function ImageUploader() {
         }
         
         // If demo mode is disabled or it's not a server error, show the error
-        setError(err.message || 'An error occurred while processing the image');
+        if (err instanceof Error) {
+          setError(err.message || 'An error occurred while processing the image');
+        } else {
+          setError('An unknown error occurred while processing the image');
+        }
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred while processing the image');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message || 'An error occurred while processing the image');
+      } else {
+        setError('An unknown error occurred while processing the image');
+      }
     } finally {
       setUploading(false);
     }

@@ -5,12 +5,11 @@ import TinderStyleAnomalyView from "@/components/TinderStyleAnomalyView";
 import StatisticsPanel from "@/components/StatisticsPanel";
 import ImageUploader from "@/components/ImageUploader";
 import SyncDataPanel from "@/components/SyncDataPanel";
-import { useImageCache } from "@/services/imageCache";
 
 export default function Home() {
   const [showDemoControls, setShowDemoControls] = useState(false);
   const [activeTab, setActiveTab] = useState('tinder');
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [, setIsScrolled] = useState(false);
   const [apiHealth, setApiHealth] = useState({
     status: 'loading',
     timestamp: new Date().toISOString(),
@@ -18,13 +17,6 @@ export default function Home() {
     lastCheck: new Date().toLocaleTimeString()
   });
 
-  // Get cache statistics from the imageCache service
-  const { cacheStats } = useImageCache();
-  
-  // Calculate cache hit ratio
-  const cacheHitRatio = cacheStats.hits + cacheStats.misses > 0 
-    ? cacheStats.hits / (cacheStats.hits + cacheStats.misses)
-    : 0;
 
   // Effect for scroll detection to add header shadow
   useEffect(() => {

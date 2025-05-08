@@ -22,7 +22,6 @@ export default function SyncDataPanel({ onDataRefreshed }: SyncDataPanelProps) {
     total_records?: number;
     source?: string;
   } | null>(null);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   
   // Add image cache hook to access cache statistics
   const { cacheStats, clearCache } = useImageCache();
@@ -41,8 +40,12 @@ export default function SyncDataPanel({ onDataRefreshed }: SyncDataPanelProps) {
         // Notify parent component to refresh data without flickering
         onDataRefreshed();
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during synchronization');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An error occurred during synchronization');
+      }
     } finally {
       setLoading(false);
     }

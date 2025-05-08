@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       min_score: min_score.toString()
     });
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${id}/similarities?${queryParams}`, {
+    const response = await fetch(`${process.env.API_URL}/images/${id}/similarities?${queryParams}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

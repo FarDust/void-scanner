@@ -58,7 +58,7 @@ describe('/api/statistics API Route', () => {
     expect(res._getJSONData()).toEqual(mockData);
     
     // Verify that fetch was called with the correct URL
-    const expectedUrl = `${process.env.NEXT_PUBLIC_API_URL}/statistics`;
+    const expectedUrl = `${process.env.API_URL}/statistics`;
     expect(global.fetch).toHaveBeenCalledWith(
       expectedUrl,
       expect.objectContaining({
@@ -104,7 +104,7 @@ describe('/api/statistics API Route', () => {
     expect(res._getJSONData()).toEqual(mockData);
     
     // Verify that fetch was called with the correct URL
-    const expectedUrl = `${process.env.NEXT_PUBLIC_API_URL}/statistics/dashboard`;
+    const expectedUrl = `${process.env.API_URL}/statistics/dashboard`;
     expect(global.fetch).toHaveBeenCalledWith(
       expectedUrl,
       expect.objectContaining({

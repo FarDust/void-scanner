@@ -9,7 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { dashboard } = req.query;
     
     // First, get basic statistics which always contain storage information
-    const basicStatsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/statistics`, {
+    const basicStatsResponse = await fetch(`${process.env.API_URL}/statistics`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // If dashboard stats were requested, get those too and merge them
     if (dashboard === 'true') {
-      const dashboardStatsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/statistics/dashboard`, {
+      const dashboardStatsResponse = await fetch(`${process.env.API_URL}/statistics/dashboard`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

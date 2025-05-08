@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (is_classified !== undefined) queryParams.append('is_classified', is_classified.toString());
     if (user_classification !== undefined) queryParams.append('user_classification', user_classification.toString());
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/search?${queryParams}`, {
+    const response = await fetch(`${process.env.API_URL}/images/search?${queryParams}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -52,7 +52,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const data = await response.json();
     
     // Get the results array
-    let normalImages: any[] = [];
+    interface NormalImage {
+      id: string;
+      url: string;
+      [key: string]: string | number | boolean | null | undefined; // Adjust this based on the actual structure of the API response
+    }
+
+    let normalImages: NormalImage[] = [];
     
     if (data && data.results && Array.isArray(data.results)) {
       normalImages = data.results;

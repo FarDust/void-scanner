@@ -84,7 +84,7 @@ describe('/api/visualizations/pca API Route', () => {
     expect(res._getJSONData()).toEqual(mockData);
     
     // Verify that fetch was called with the correct URL and body
-    const expectedUrl = `${process.env.NEXT_PUBLIC_API_URL}/visualizations/pca`;
+    const expectedUrl = `${process.env.API_URL}/visualizations/pca`;
     expect(global.fetch).toHaveBeenCalledWith(
       expectedUrl,
       expect.objectContaining({
