@@ -10,8 +10,10 @@
     "test": "jest"
   },
   "dependencies": {
+    "formidable": "^3.5.4",
     "next": "15.3.1",
     "next-themes": "^0.4.6",
+    "node-fetch": "^3.3.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.5.2",
