@@ -28,8 +28,8 @@ Void Scanner is a modern web application designed to help astronomers and resear
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/void_scanner.git
-   cd void_scanner
+   git clone https://github.com/FarDust/void-scanner.git
+   cd void-scanner
    ```
 
 2. Install dependencies:

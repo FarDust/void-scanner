@@ -8,7 +8,7 @@ import SyncDataPanel from "@/components/SyncDataPanel";
 
 export default function Home() {
   const [showDemoControls, setShowDemoControls] = useState(false);
-  const [activeTab, setActiveTab] = useState('tinder');
+  const [activeTab, setActiveTab] = useState('welcome');
   const [, setIsScrolled] = useState(false);
   const [apiHealth, setApiHealth] = useState({
     status: 'loading',
@@ -98,6 +98,19 @@ export default function Home() {
           {/* Navigation icons */}
           <nav className="flex-1 py-4 flex flex-col items-center space-y-4">
             <button
+              onClick={() => setActiveTab('welcome')}
+              className={`w-12 h-12 flex items-center justify-center rounded-lg transition-colors ${
+                activeTab === 'welcome' ? 'bg-blue-700' : 'hover:bg-blue-800'
+              }`}
+              title="About Void Scanner"
+              aria-label="About Void Scanner"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="sr-only">About</span>
+            </button>
+            <button
               onClick={() => setActiveTab('tinder')}
               className={`w-12 h-12 flex items-center justify-center rounded-lg transition-colors ${
                 activeTab === 'tinder' ? 'bg-blue-700' : 'hover:bg-blue-800'
@@ -185,6 +198,73 @@ export default function Home() {
 
             {/* Content based on active tab */}
             <div>
+              {activeTab === 'welcome' && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                  <div className="flex items-center justify-center mb-6">
+                    <div className="bg-blue-600 rounded-full p-3 mr-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Welcome to Void Scanner</h2>
+                  </div>
+                  
+                  <div className="space-y-6 text-gray-700 dark:text-gray-300">
+                    <div>
+                      <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-2">What is Void Scanner?</h3>
+                      <p>Void Scanner is a portfolio project demonstrating a web interface for astronomical anomaly detection and classification. It explores techniques for identifying unusual patterns in astronomical image data, allowing users to review and categorize potential anomalies in a streamlined workflow. This experimental tool showcases how modern web technologies could help in analyzing celestial data.</p>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-2">Key Features</h3>
+                      <ul className="list-disc pl-6 space-y-2">
+                        <li><span className="font-semibold">Intuitive Anomaly Review:</span> Swipe through detected anomalies using our Tinder-style interface for quick classification.</li>
+                        <li><span className="font-semibold">Image Processing:</span> Upload and analyze astronomical images to detect potential anomalies.</li>
+                        <li><span className="font-semibold">Data Synchronization:</span> Keep your anomaly database updated with the latest detections and classifications.</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-2">Powered by Anomaly Reaper</h3>
+                      <p>Void Scanner&apos;s frontend interfaces with the <a href="https://github.com/FarDust/anomaly-reaper" className="text-blue-500 hover:text-blue-700 underline" target="_blank" rel="noopener noreferrer">Anomaly Reaper</a> backend API, which provides powerful anomaly detection capabilities:</p>
+                      <ul className="list-disc pl-6 space-y-2 mt-2">
+                        <li><span className="font-semibold">FITS Image Processing:</span> Processes astronomical image files from TESS (Transiting Exoplanet Survey Satellite) missions.</li>
+                        <li><span className="font-semibold">AI-Powered Embeddings:</span> Utilizes Google Vertex AI to generate embeddings from image data.</li>
+                        <li><span className="font-semibold">PCA Analysis:</span> Applies Principal Component Analysis to detect outliers and anomalies.</li>
+                      </ul>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-2">How to Get Started</h3>
+                      <p>To begin using Void Scanner, navigate to the tabs in the sidebar:</p>
+                      <ul className="list-disc pl-6 space-y-1 mt-2">
+                        <li><span className="font-semibold">Review Anomalies:</span> Examine and classify detected anomalies</li>
+                        <li><span className="font-semibold">Upload Images:</span> Submit your own astronomical images for anomaly detection</li>
+                        <li><span className="font-semibold">Admin Dashboard:</span> View statistics and manage data synchronization</li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg">
+                      <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-2">Portfolio Project & Feedback</h3>
+                      <p className="mb-2">This is a portfolio project showcasing capabilities with real-world tools and technologies. Your feedback is valuable and can be provided through:</p>
+                      <ul className="list-disc pl-6 space-y-1">
+                        <li>GitHub Issues: <a href="https://github.com/FarDust/void-scanner" className="text-blue-500 hover:text-blue-700 underline" target="_blank" rel="noopener noreferrer">github.com/FarDust/void-scanner</a></li>
+                        <li>LinkedIn: <a href="https://linkedin.com/in/gnfaundez" className="text-blue-500 hover:text-blue-700 underline" target="_blank" rel="noopener noreferrer">linkedin.com/in/gnfaundez</a></li>
+                      </ul>
+                    </div>
+                    
+                    <div className="flex justify-center pt-4">
+                      <button 
+                        onClick={() => setActiveTab('tinder')}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors duration-300"
+                      >
+                        Get Started with Anomaly Review
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {activeTab === 'tinder' && <TinderStyleAnomalyView demoControlsVisible={showDemoControls} />}
               {activeTab === 'upload' && <ImageUploader />}
               {activeTab === 'admin' && <><SyncDataPanel /> <StatisticsPanel/></>}
@@ -204,7 +284,21 @@ export default function Home() {
               </svg>
               <span className="font-semibold">Void Scanner</span>
             </div>
-            <span>FarDust © 2025</span>
+            <div className="flex items-center space-x-4">
+              <a 
+                href="https://github.com/FarDust" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="flex items-center hover:text-blue-400 transition-colors duration-200"
+                title="GitHub - FarDust"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
+                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                <span>FarDust</span>
+              </a>
+              <span>© 2025</span>
+            </div>
           </div>
         </div>
       </footer>
